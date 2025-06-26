@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/* Background */
+.bg-theme {
+  background-color: var(--primary-orange);
+}
+
+/* Text */
+.text-theme {
+  color: var(--primary-orange);
+}
+
+/* Border */
+.border-theme {
+  border-color: var(--primary-orange);
+}
+
+/* Hover Background */
+.hover\:bg-theme:hover {
+  background-color: var(--primary-orange);
+}
+
+/* Hover Text */
+.hover\:text-theme:hover {
+  color: var(--primary-orange);
+}
+
+/* ====== Color Palette Variables ====== */
+
+:root {
+  --primary-sun: #ffeb3b;
+  --primary-amber: #ff9800;
+  --primary-orange: #ff5722;
+  --primary-redish: #f44336;
+  --primary-pinky: #e91e63;
+}
+
+@layer utilities {
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 300ms ease-out forwards;
+  }
+}
+

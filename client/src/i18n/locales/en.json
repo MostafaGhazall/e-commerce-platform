@@ -1,0 +1,250 @@
+{
+  "home": "Home",
+  "shop": "Shop",
+
+  "wishlist": {
+    "title": "Your Wishlist",
+    "emptyTitle": "Your wishlist is empty.",
+    "browse": "Browse Products"
+  },
+
+  "navbar": {
+    "Search MyShop...": "Search MyShop...",
+    "Search": "Search",
+    "Profile": "Profile",
+    "Orders": "Orders",
+    "Logout": "Logout",
+    "Sign In": "Sign In",
+    "Account": "Account",
+    "wishlist": "Wishlist",
+    "Cart": "Cart",
+    "Home": "Home",
+    "Clothing": "Clothing",
+    "Accessories": "Accessories",
+    "Electronics": "Electronics",
+    "Furniture": "Furniture"
+  },
+
+  "homePage": {
+    "welcome": "Welcome to MyShop",
+    "intro": "Discover quality products tailored for your lifestyle.",
+    "shopNow": "Shop Now",
+    "featured": "Featured Products",
+    "noProducts": "No products yet...",
+    "flashSaleTitle": "Super Flash Sale",
+    "flashSaleDesc": "Sunday to Thursday at 2PM",
+    "wheelTitle": "Wheel Of Fortunes",
+    "wheelDesc": "Spin and Win Daily Rewards",
+    "discountTitle": "Extra Discounts",
+    "discountDesc": "Exclusive Vouchers & Checkout Deal",
+    "ctaTitle": "Don't miss out",
+    "ctaDesc": "Great deals and handpicked collections await.",
+    "ctaButton": "Browse All Products"
+  },
+
+  "productDetails": {
+    "Please provide both a rating and comment.": "Please provide both a rating and comment.",
+    "Product not found.": "Product not found.",
+    "Review submitted!": "Review submitted!",
+    "Failed to submit review.": "Failed to submit review.",
+    "Please select a size.": "Please select a size.",
+    "Please select a color.": "Please select a color.",
+    "added to cart!": "added to cart!",
+    "VARIATION_AVAILABLE": "VARIATION AVAILABLE",
+    "COLOR_OPTIONS": "COLOR OPTIONS",
+    "Add to cart": "Add to cart",
+    "Product details": "Product details",
+    "Verified Customer Feedback": "Verified Customer Feedback",
+    "Your Rating": "Your Rating",
+    "Your Comment": "Your Comment",
+    "Share your thoughts about this product...": "Share your thoughts about this product...",
+    "Submit Review": "Submit Review",
+    "Anonymous": "Anonymous",
+    "verifiedRatings": "Verified Ratings",
+    "Add to wishlist": "Add to wish list",
+    "Remove from wishlist": "Remove from wish list",
+    "Please sign in to add to cart": "Please sign in to add to cart",
+    "Please sign in to manage wishlist": "Please sign in to manage your wishlist",
+    "Please sign in to submit a review": "Please sign in to submit a review"
+  },
+
+  "footer": {
+    "description": "Modern shopping made simple.",
+    "quickLinks": "Quick Links",
+    "customer": "Customer",
+    "account": "Account",
+    "orderHistory": "Order History",
+    "contact": "Contact Us",
+    "social": "Social",
+    "instagram": "Instagram",
+    "twitter": "Twitter",
+    "facebook": "Facebook",
+    "rights": "All rights reserved.",
+    "cart": "Cart",
+    "wishlist": "Wishlist"
+  },
+
+  "contact": {
+    "title": "Contact Us",
+    "name": "Your Name",
+    "email": "Your Email",
+    "message": "Your Message",
+    "submit": "Send Message",
+    "thankYou": "Thanks! We'll get back to you shortly."
+  },
+
+  "productListing": {
+    "categories": "Categories",
+    "clearFilters": "Clear Filters",
+    "selectCategory": "Select Category",
+    "sortBy": "Sort by",
+    "priceLow": "Price: Low to High",
+    "priceHigh": "Price: High to Low",
+    "alpha": "Alphabetical",
+    "noProducts": "No matching products found.",
+    "tryAdjusting": "Try adjusting your filters or explore other categories.",
+    "resetFilters": "Reset Filters"
+  },
+
+  "login": {
+    "title": "Login",
+    "email": "Email",
+    "emailPlaceholder": "Email",
+    "password": "Password",
+    "passwordPlaceholder": "Password",
+    "submit": "Sign In",
+    "noAccount": "Don't have an account?",
+    "registerLink": "Register here",
+    "fillFields": "Please fill in both fields",
+    "invalid": "Invalid email or password",
+    "success": "Welcome back!"
+  },
+
+  "register": {
+    "title": "Register",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "agreeTerms": "I agree to the",
+    "terms": "terms and conditions",
+    "submit": "Sign Up",
+    "alreadyHaveAccount": "Already have an account?",
+    "loginLink": "Sign In",
+    "strength": "Strength",
+    "strengthWeak": "Weak",
+    "strengthMedium": "Medium",
+    "strengthStrong": "Strong",
+    "errors": {
+      "fillAll": "Please fill in all fields",
+      "invalidEmail": "Please enter a valid email",
+      "shortPassword": "Password must be at least 6 characters",
+      "noMatch": "Passwords do not match",
+      "terms": "You must agree to the terms and conditions",
+      "exists": "Email already exists. Try logging in.",
+      "success": "Account created!"
+    }
+  },
+
+  "cartItem": {
+    "price": "Price",
+    "size": "Size",
+    "color": "Color",
+    "remove": "Remove"
+  },
+
+  "cart": {
+    "title": "Your Cart",
+    "emptyTitle": "Your Cart is Empty",
+    "shopNow": "Go Shopping",
+    "clear": "Clear Cart",
+    "checkout": "Proceed to Checkout",
+    "total": "Total",
+    "confirmTitle": "Are you sure?",
+    "confirmMessage": "This will remove all items from your cart.",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "itemRemoved": "Item removed from cart",
+    "cleared": "Cart cleared",
+    "updated": "Quantity updated"
+  },
+
+  "checkout": {
+    "title": "Checkout",
+    "contactInfo": "Contact Information",
+    "shippingInfo": "Shipping Information",
+    "paymentMethod": "Payment Method",
+    "placeOrder": "Place Order",
+    "orderSummary": "Order Summary",
+    "quantity": "Quantity",
+    "size": "Size",
+    "color": "Color",
+    "subtotal": "Subtotal",
+    "deliveryCharge": "Delivery Charge",
+    "free": "FREE",
+    "tax": "Tax",
+    "included": "Included",
+    "total": "Total",
+    "arrivalTime": "Your order will arrive within 3–5 business days.",
+    "fullName": "Full Name",
+    "email": "Email",
+    "shippingAddress": "Shipping Address",
+    "city": "City",
+    "region": "Region",
+    "postalCode": "Postal Code",
+    "country": "Country",
+    "phoneNumber": "Phone Number",
+    "useAsBilling": "Use as Billing Address",
+    "orderSuccess": "Order placed successfully!"
+  },
+  "errors": {
+    "nameRequired": "Name is required",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Invalid email format",
+    "addressRequired": "Address is required",
+    "phoneRequired": "Phone is required",
+    "countryRequired": "Country is Required",
+    "cityRequired": "City is Required",
+    "regionRequired": "Region is Required",
+    "postalCodeRequired": "Postal Code is Required",
+    "phoneInvalid": "Invalid phone number",
+    "pleaseFillRequiredFields": "Please fill in all required fields"
+  },
+
+  "orders": {
+    "noOrders": "No Orders",
+    "orderHistory": "Order History",
+    "orderID": "Order ID",
+    "quantity": "Quantity",
+    "size": "Size",
+    "color": "Color",
+    "showAll": "Show all ({{count}} items)",
+    "showLess": "Show less",
+    "inTransit": "In Transit",
+    "arrivalEstimate": "Your order will arrive within 3–5 business days.",
+    "viewDetails": "View Details",
+    "orderDetailsDescription": "Details of your order including items and shipping info.",
+    "shippingAddress": "Shipping Address",
+    "orderSummary": "Order Summary",
+    "total": "Total",
+    "close": "Close"
+  },
+
+  "userProfile": {
+    "accountOverview": "Account Overview",
+    "accountDetails": "Account Details",
+    "addressBook": "Address Book",
+    "editAddress": "Edit Address",
+    "addAddress": "Add Address",
+    "city": "City",
+    "region": "Region",
+    "postalCode": "Postal Code",
+    "country": "Country",
+    "phone": "Phone",
+    "cancel": "Cancel",
+    "saveAddress": "Save Address",
+    "address":"Address",
+    "noAddress":"No Address"
+  }
+}
