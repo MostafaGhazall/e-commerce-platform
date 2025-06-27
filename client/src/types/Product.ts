@@ -1,24 +1,39 @@
 export interface Product {
   id: string;
   name: string;
-  price: number;
+  slug: string;
   description: string;
-  images: string[];       // Multiple images
-  stock: number;
-  rating: number;
-  reviews: ProductReview[];
+  price: number;
   category: string;
-  sizes?: string[];
-  colors?: {
-    name: string;              // e.g., "Dark Green"
-    value: string;             // e.g., "#006400"
-    images?: string[];         // optional array of image paths for that color
-  }[];      // Optional color variations (e.g., ['black', 'white'])
+  rating: number;
+  stock: number;
+  sizes: string[];
+
+  colors: {
+    id: string;
+    name: string;
+    value: string;              // Hex value like "#006400"
+    images: Image[];            // Images for this color variant
+  }[];
+
+  images: Image[];              // Main product images (outside color variations)
+
+  reviews: ProductReview[];
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Image {
+  id: string;
+  url: string;
 }
 
 export interface ProductReview {
+  id: string;
   comment: string;
   name: string;
   rating: number;
-  date: string;
+  createdAt: string;
 }
+

@@ -1,9 +1,8 @@
 import { useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { useProductStore } from "../contexts/useStore";
+import { useProductStore, addReviewToProduct } from "../contexts/useStore";
 import { useCartStore } from "../contexts/useCartStore";
 import { useWishlistStore } from "../contexts/useWishlistStore";
-import { addReviewToProduct } from "../services/indexedDB";
 import toast from "react-hot-toast";
 import {
   Heart,
@@ -17,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import type { Product } from "../types/Product";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../contexts/useAuthStore";
+
 
 const ProductDetails = () => {
   const { t } = useTranslation();
@@ -68,8 +68,14 @@ const ProductDetails = () => {
     };
 
     try {
-      await addReviewToProduct(product.id, review); // Save to IndexedDB
-      product.reviews.push(review); // Update UI
+      const savedReview = await addReviewToProduct(product.id, {
+        comment: review.comment,
+        name: review.name,
+        rating: review.rating,
+      });
+
+      product.reviews.push(savedReview); // Push backend-confirmed version
+
       setNewReview({ rating: 0, comment: "" });
       toast.success(t("productDetails.Review submitted!")); // Toast translation
     } catch {
@@ -83,13 +89,11 @@ const ProductDetails = () => {
       navigate("/Login");
       return;
     }
-  
+
     if (!product) return;
-  
+
     toggleWishlist(product.id);
   };
-  
-  
 
   const [selectedSize, setSelectedSize] = useState<string | undefined>();
   type ColorOption = NonNullable<Product["colors"]>[number];
@@ -135,8 +139,9 @@ const ProductDetails = () => {
       id: product.id,
       name: product.name,
       image:
-        selectedColor?.images?.[selectedImageIndex] ??
-        product.images[selectedImageIndex],
+        selectedColor?.images?.[selectedImageIndex]?.url ??
+        product.images[selectedImageIndex]?.url,
+
       price: product.price,
       quantity: 1,
       size: selectedSize,
@@ -190,16 +195,16 @@ const ProductDetails = () => {
         <div className="flex-1">
           <div className="overflow-hidden rounded shadow group">
             <img
-              src={currentImages[selectedImageIndex]}
+              src={currentImages[selectedImageIndex]?.url}
               alt={product.name}
               className="w-full h-96 object-contain transition-transform duration-300 group-hover:scale-110"
             />
           </div>
           <div className="flex mt-4 gap-2 overflow-x-auto">
-            {currentImages.map((img: string, idx: number) => (
+            {currentImages.map((img, idx) => (
               <img
                 key={idx}
-                src={img}
+                src={img.url}
                 onClick={() => setSelectedImageIndex(idx)}
                 className={`h-16 w-16 object-cover rounded border cursor-pointer ${
                   selectedImageIndex === idx
@@ -350,7 +355,8 @@ const ProductDetails = () => {
               </div>
               <p className="text-gray-800 mb-1">{r.comment}</p>
               <p className="text-xs text-gray-500">
-                {r.date} by {r.name || t("productDetails.Anonymous")}
+                {new Date(r.createdAt).toLocaleDateString()} by{" "}
+                {r.name || t("productDetails.Anonymous")}
               </p>
             </li>
           ))}

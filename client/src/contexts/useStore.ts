@@ -1,10 +1,19 @@
 import { create } from "zustand";
-import { Product } from "../types/Product";
-import { getAllProducts } from "../services/indexedDB";
-import {
-  getProductsFromLocalStorage,
-  saveProductsToLocalStorage,
-} from "../services/localStorage";
+import api from "../api/axios";
+import { Product, ProductReview } from "../types/Product";
+
+export const fetchAllProducts = async (): Promise<Product[]> => {
+  const { data } = await api.get<Product[]>("/products");
+  return data;
+};
+
+export const addReviewToProduct = async (
+  productId: string,
+  review: Omit<ProductReview, "id" | "createdAt">
+): Promise<ProductReview> => {
+  const { data } = await api.post<ProductReview>(`/products/${productId}/reviews`, review);
+  return data;
+};
 
 interface ProductState {
   products: Product[];
@@ -48,13 +57,11 @@ export const useProductStore = create<ProductState>((set, get) => ({
   loadProducts: async () => {
     set({ loading: true });
     try {
-      const products = await getAllProducts();
+      const products = await fetchAllProducts();
       set({ products });
-      saveProductsToLocalStorage(products);
     } catch (error) {
-      console.warn("IndexedDB failed. Falling back to localStorage.", error);
-      const fallbackProducts = getProductsFromLocalStorage();
-      set({ products: fallbackProducts });
+      console.error("Failed to load products from API:", error);
+      set({ products: [] });
     } finally {
       get().filterProducts();
       set({ loading: false });

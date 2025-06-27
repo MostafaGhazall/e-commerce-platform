@@ -8,7 +8,6 @@ import {
 import { Toaster } from "react-hot-toast";
 import { usePreferenceStore } from "./contexts/usePreferenceStore";
 import { useAuthStore } from "./contexts/useAuthStore";
-import { seedProducts } from "./services/seedProducts";
 import { useProductStore } from "./contexts/useStore";
 
 import Home from "./pages/Home";
@@ -39,7 +38,6 @@ const App = () => {
 
   useEffect(() => {
     const load = async () => {
-      await seedProducts();
       await useProductStore.getState().loadProducts();
     };
     load();

@@ -27,6 +27,8 @@ const ProductCard = ({ product }: Props) => {
     </button>
   );
 
+  const mainImage = product.images.length > 0 ? product.images[0].url : "/placeholder.png";
+
   return (
     <div className="relative border border-gray-200 rounded-lg p-4 shadow hover:shadow-md transition bg-white text-gray-900 flex flex-col h-full">
       {/* Wishlist Button */}
@@ -41,13 +43,17 @@ const ProductCard = ({ product }: Props) => {
       {/* Product Info */}
       <Link to={`/product/${product.id}`} className="flex-1 flex flex-col">
         <img
-          src={product.images[0]}
+          src={mainImage}
           alt={product.name}
           className="w-full h-48 object-contain rounded mb-3"
         />
         <h3 className="font-bold text-lg text-[var(--primary-orange)] mb-1">{product.name}</h3>
-        <p className="text-[var(--primary-redish)] font-semibold mb-2">EGP {product.price.toFixed(2)}</p>
-        <p className="text-sm text-gray-600 line-clamp-2 mb-4 flex-grow">{product.description}</p>
+        <p className="text-[var(--primary-redish)] font-semibold mb-2">
+          EGP {product.price.toFixed(2)}
+        </p>
+        <p className="text-sm text-gray-600 line-clamp-2 mb-4 flex-grow">
+          {product.description}
+        </p>
       </Link>
     </div>
   );
