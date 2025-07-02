@@ -65,7 +65,10 @@
     "Remove from wishlist": "إزالة من قائمة الرغبات",
     "Please sign in to add to cart": "يرجى تسجيل الدخول لإضافة المنتج إلى السلة",
     "Please sign in to manage wishlist": "يرجى تسجيل الدخول لإدارة المفضلة",
-    "Please sign in to submit a review": "يرجى تسجيل الدخول لإرسال التقييم"
+    "Please sign in to submit a review": "يرجى تسجيل الدخول لإرسال التقييم",
+    "Added to wishlist": "تمت الإضافة إلى قائمة الرغبات",
+    "Removed from wishlist": "تمت الإزالة من قائمة الرغبات",
+    "reviewBy": "{{date}} بواسطة {{name}}"
   },
 
   "contact": {
@@ -192,11 +195,13 @@
     "shippingAddress": "عنوان الشحن",
     "city": "المدينة",
     "region": "المنطقة",
-    "postalCode": "الرمز البريدي",
+    "postalcode": "الرمز البريدي",
     "country": "الدولة",
     "phoneNumber": "رقم الهاتف",
     "useAsBilling": "استخدامه كعنوان الفاتورة",
-    "orderSuccess": "تم تأكيد الطلب بنجاح!"
+    "orderSuccess": "تم تأكيد الطلب بنجاح!",
+    "emptyCart": "سلة التسوق فارغة. سيتم التحويل...",
+    "loading": "جارٍ تحميل صفحة الدفع..."
   },
   "errors": {
     "nameRequired": "الاسم مطلوب",
@@ -209,11 +214,12 @@
     "regionRequired": "المنطقة مطلوبة",
     "postalCodeRequired": "الرمز البريدي مطلوب",
     "phoneInvalid": "رقم الهاتف غير صالح",
-    "pleaseFillRequiredFields": "يرجى ملء كافة الحقول المطلوبة"
+    "pleaseFillRequiredFields": "يرجى ملء كافة الحقول المطلوبة",
+    "failedOrder": "فشل في تنفيذ الطلب. حاول مرة أخرى."
   },
 
   "orders": {
-    "noOrders": "لا توجد طلبات",
+    "noOrdersFound": "لا توجد طلبات",
     "orderHistory": "سجل الطلبات",
     "orderID": "رقم الطلب",
     "quantity": "الكمية",
@@ -228,7 +234,16 @@
     "shippingAddress": "عنوان الشحن",
     "orderSummary": "ملخص الطلب",
     "total": "الإجمالي",
-    "close": "إغلاق"
+    "close": "إغلاق",
+    "loading": "جارٍ تحميل الطلبات...",
+    "date": "التاريخ",
+    "status": "الحالة",
+    "paymentMethod": "طريقة الدفع",
+    "estimatedProgress": "نسبة التقدم المقدرة",
+    "name": "الاسم",
+    "phone": "رقم الهاتف",
+    "email": "البريد الإلكتروني",
+    "address": "العنوان"
   },
 
   "userProfile": {

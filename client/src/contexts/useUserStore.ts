@@ -1,60 +1,82 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import api from "../api/axios";
+import type { UpdateProfileInput } from "../../../shared/userValidators";
 
-// Define the UserProfile interface with new fields
 interface UserProfile {
   firstName: string;
-  lastName: string;
-  email: string;
-  address: string;
-  phone: string;
-  birthday: string;
-  gender: string;
-  city: string;
-  country: string;
-  postalcode: string;
-  region: string;
-  updateUserProfile: (profile: Partial<UserProfile>) => void;
+  lastName:  string;
+  email:     string;
+  address:   string;
+  phone:     string;
+  birthday:  string;
+  gender:    string;
+  city:      string;
+  country:   string;
+  postalcode:string;
+  region:    string;
+
+  updateUserProfile: (data: Partial<UserProfile>) => void;
+  resetUserProfile:  () => void;
+  fetchUserProfile:  () => Promise<void>;
+  saveUserProfile:   (data: Partial<UpdateProfileInput>) => Promise<void>;
 }
 
-// Define custom storage to satisfy PersistStorage interface
-const customStorage = {
-  getItem: (name: string) => {
-    const value = localStorage.getItem(name);
-    return value ? JSON.parse(value) : null;
-  },
-  setItem: (name: string, value: any) => {
-    localStorage.setItem(name, JSON.stringify(value));
-  },
-  removeItem: (name: string) => {
-    localStorage.removeItem(name);
-  }
-};
+export const useUserStore = create<UserProfile>((set, get) => ({
+  // initial
+  firstName:  "",
+  lastName:   "",
+  email:      "",
+  address:    "",
+  phone:      "",
+  birthday:   "",
+  gender:     "",
+  city:       "",
+  country:    "",
+  postalcode: "",
+  region:     "",
 
-export const useUserStore = create<UserProfile>()(
-  persist(
-    (set) => ({
-      firstName: '',
-      lastName: '',
-      email: '',
-      address: '',
-      phone: '',
-      birthday: '',
-      gender: '',
-      city: '',
-      country: '',
-      postalcode: '',
-      region: '',
-      updateUserProfile: (profile) => {
-        // Update the user profile with the new data
-        set((state) => ({ ...state, ...profile }));
-      },
+  updateUserProfile: data => set(state => ({ ...state, ...data })),
+
+  resetUserProfile: () =>
+    set({
+      firstName:  "",
+      lastName:   "",
+      email:      "",
+      address:    "",
+      phone:      "",
+      birthday:   "",
+      gender:     "",
+      city:       "",
+      country:    "",
+      postalcode: "",
+      region:     "",
     }),
-    {
-      name: 'user-profile', // Key for local storage
-      storage: customStorage, // Use custom storage
+
+  fetchUserProfile: async () => {
+    try {
+      const { data } = await api.get("/user/profile", { withCredentials: true });
+      set({ ...data });
+    } catch (err) {
+      console.error("fetchUserProfile failed", err);
     }
-  )
-);
+  },
 
-
+  saveUserProfile: async profile => {
+    try {
+      // optimistic UI update
+      get().updateUserProfile(profile);
+      // use PATCH to match backend
+      const { data } = await api.patch(
+        "/user/profile",
+        profile,
+        { withCredentials: true }
+      );
+      // sync with server
+      set({ ...data });
+    } catch (err) {
+      console.error("saveUserProfile failed", err);
+      // rollback
+      await get().fetchUserProfile();
+    }
+  },
+}));

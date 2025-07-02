@@ -1,73 +1,101 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import axios from "../api/axios";
 import { CartItem } from "../types/CartItem";
+
+export interface AddToCartPayload {
+  productId: string;
+  quantity: number;
+  size?: string;
+  color?: string;
+  colorName?: string;
+}
 
 interface CartState {
   cart: CartItem[];
-  addToCart: (item: CartItem) => void;
-  removeFromCart: (id: string, size?: string, color?: string) => void;
-  clearCart: () => void;
-  updateQuantity: (id: string, quantity: number, size?: string, color?: string) => void;
+  fetchCart: () => Promise<void>;
+  addToCart: (item: AddToCartPayload) => Promise<void>;
+  removeFromCart: (cartItemId: string) => Promise<void>;
+  updateQuantity: (cartItemId: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
 }
 
-export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      cart: [],
+export const useCartStore = create<CartState>((set) => ({
+  cart: [],
 
-      addToCart: (item) => {
-        const existing = get().cart.find(
-          (i) =>
-            i.id === item.id &&
-            i.size === item.size &&
-            i.color === item.color
-        );
+  fetchCart: async () => {
+    try {
+      const res = await axios.get("/cart", { withCredentials: true });
+      const items = res.data.items || [];
+      const cartItems: CartItem[] = items.map((item: any) => {
+        const fallbackImage =
+          item.product.images?.[0]?.url || "/images/default-product.png";
 
-        if (existing) {
-          set({
-            cart: get().cart.map((i) =>
-              i.id === item.id &&
-              i.size === item.size &&
-              i.color === item.color
-                ? { ...i, quantity: i.quantity + item.quantity }
-                : i
-            ),
-          });
-        } else {
-          set({ cart: [...get().cart, item] });
-        }
-      },
+        const variantImage =
+          item.colorName &&
+          item.product.colors?.find(
+            (c: any) => c.name.toLowerCase() === item.colorName.toLowerCase()
+          )?.images?.[0]?.url;
 
-      removeFromCart: (id, size, color) => {
-        set({
-          cart: get().cart.filter(
-            (i) => i.id !== id || i.size !== size || i.color !== color
-          ),
-        });
-      },
-
-      clearCart: () => set({ cart: [] }),
-
-      updateQuantity: (id, quantity, size, color) => {
-        if (quantity <= 0) {
-          set({
-            cart: get().cart.filter(
-              (i) => !(i.id === id && i.size === size && i.color === color)
-            ),
-          });
-        } else {
-          set({
-            cart: get().cart.map((i) =>
-              i.id === id && i.size === size && i.color === color
-                ? { ...i, quantity }
-                : i
-            ),
-          });
-        }
-      },
-    }),
-    {
-      name: "cart-storage", // key in localStorage
+        return {
+          id: item.id,
+          productId: item.productId,
+          name: item.product.name,
+          image: variantImage || fallbackImage, // ← use color image if found
+          price: item.product.price,
+          quantity: item.quantity,
+          size: item.size,
+          color: item.color,
+          colorName: item.colorName,
+        };
+      });
+      set({ cart: cartItems });
+    } catch (err) {
+      console.error("Failed to fetch cart", err);
+      set({ cart: [] });
     }
-  )
-);
+  },
+
+  addToCart: async ({ productId, quantity, size, color, colorName }) => {
+    try {
+      await axios.post(
+        "/cart",
+        { productId, quantity, size, color, colorName },
+        { withCredentials: true }
+      );
+      await useCartStore.getState().fetchCart();
+    } catch (err) {
+      console.error("Add to cart failed", err);
+    }
+  },
+
+  removeFromCart: async (cartItemId) => {
+    try {
+      await axios.delete(`/cart/${cartItemId}`, { withCredentials: true });
+      await useCartStore.getState().fetchCart();
+    } catch (err) {
+      console.error("Remove from cart failed", err);
+    }
+  },
+
+  updateQuantity: async (cartItemId, quantity) => {
+    try {
+      await axios.patch(
+        `/cart/${cartItemId}`,
+        { quantity },
+        { withCredentials: true }
+      );
+      await useCartStore.getState().fetchCart();
+    } catch (err) {
+      console.error("Update quantity failed", err);
+    }
+  },
+
+  clearCart: async () => {
+    try {
+      await axios.delete("/cart/clear/all", { withCredentials: true });
+      set({ cart: [] });
+    } catch (err) {
+      console.error("Clear cart failed", err);
+    }
+  },
+}));

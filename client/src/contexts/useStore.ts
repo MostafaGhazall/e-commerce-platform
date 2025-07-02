@@ -9,9 +9,16 @@ export const fetchAllProducts = async (): Promise<Product[]> => {
 
 export const addReviewToProduct = async (
   productId: string,
-  review: Omit<ProductReview, "id" | "createdAt">
+  review: {
+    comment: string;
+    name: string;
+    rating: number;
+  }
 ): Promise<ProductReview> => {
-  const { data } = await api.post<ProductReview>(`/products/${productId}/reviews`, review);
+  const { data } = await api.post<ProductReview>(
+    `/products/${productId}/reviews`,
+    review
+  );
   return data;
 };
 

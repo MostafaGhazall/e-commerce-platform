@@ -1,19 +1,18 @@
-import { useWishlistStore } from '../contexts/useWishlistStore';
-import { useProductStore } from '../contexts/useStore';
-import ProductCard from '../components/ProductCard';
-import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useEffect } from "react";
+import { useWishlistStore } from "../contexts/useWishlistStore";
+import ProductCard from "../components/ProductCard";
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export default function Wishlist() {
-  const { wishlist } = useWishlistStore();
-  const { products } = useProductStore();
+  const { wishlist, fetchWishlist } = useWishlistStore();
   const { t } = useTranslation();
 
-  const wishlistedProducts = products.filter((p) =>
-    wishlist.some((item) => item.id === p.id)
-  );
+  useEffect(() => {
+    fetchWishlist();
+  }, []);
 
-  if (wishlistedProducts.length === 0)
+  if (wishlist.length === 0)
     return (
       <div className="text-center py-20 text-gray-500">
         <img
@@ -35,7 +34,7 @@ export default function Wishlist() {
     <div className="max-w-7xl mx-auto px-4 py-10">
       <h1 className="text-2xl font-bold mb-6">{t("wishlist.title")}</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-        {wishlistedProducts.map((product) => (
+        {wishlist.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>

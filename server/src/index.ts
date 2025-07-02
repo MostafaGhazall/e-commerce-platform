@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 
 import authRoutes from "./routes/auth";
 import productRoutes from "./routes/products";
@@ -16,8 +18,6 @@ import adminDashboardRoutes from "./routes/adminDashboardRoutes";
 
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,15 +51,15 @@ app.use("/api/user", userRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/admin/products", adminProductRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
-app.use("/api/admin/dashboard", adminDashboardRoutes);
+app.use("/api/admin", adminDashboardRoutes);
 
 // Global error handler
 app.use(
   (
     err: any,
-    req: express.Request,
+    _req: express.Request,
     res: express.Response,
-    next: express.NextFunction
+    _next: express.NextFunction
   ) => {
     console.error("Unhandled error:", err);
     res.status(500).json({ message: "Internal Server Error" });

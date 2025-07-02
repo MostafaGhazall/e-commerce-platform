@@ -34,6 +34,6 @@ export interface ProductReview {
   comment: string;
   name: string;
   rating: number;
-  createdAt: string;
+  date: string;
 }
 

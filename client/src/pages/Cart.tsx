@@ -17,16 +17,15 @@ const Cart = () => {
     if (products.length === 0) loadProducts();
   }, []);
 
-  const getProductDetails = (id: string) => products.find((p) => p.id === id);
+  const getProductDetails = (productId: string) =>
+    products.find((p) => p.id === productId);
 
   const total = cart.reduce((acc, item) => {
-    const product = getProductDetails(item.id);
-    if (!product) return acc;
-    return acc + product.price * item.quantity;
+    return acc + item.price * item.quantity;
   }, 0);
 
-  const handleRemove = (id: string, size?: string, color?: string) => {
-    removeFromCart(id, size, color);
+  const handleRemove = (cartItemId: string) => {
+    removeFromCart(cartItemId);
     toast.success(t("cart.itemRemoved"));
   };
 
@@ -36,14 +35,9 @@ const Cart = () => {
     toast.success(t("cart.cleared"));
   };
 
-  const handleQuantityChange = (
-    id: string,
-    qty: number,
-    size?: string,
-    color?: string
-  ) => {
+  const handleQuantityChange = (cartItemId: string, qty: number) => {
     if (qty < 1) return;
-    updateQuantity(id, qty, size, color);
+    updateQuantity(cartItemId, qty);
     toast.success(t("cart.updated"));
   };
 
@@ -77,23 +71,24 @@ const Cart = () => {
 
       <div className="space-y-6">
         {cart.map((item) => {
-          const product = getProductDetails(item.id);
+          const product = getProductDetails(item.productId);
           if (!product) return null;
 
           return (
             <CartItem
-              key={`${item.id}-${item.size || "default"}-${item.color || "default"}`}
+              key={item.id}
               id={item.id}
-              name={product.name}
+              productId={item.productId}
+              name={item.name}
               image={item.image}
-              price={product.price}
+              price={item.price}
               quantity={item.quantity}
               size={item.size}
               color={item.color}
               colorName={item.colorName}
-              onIncrease={() => handleQuantityChange(item.id, item.quantity + 1, item.size, item.color)}
-              onDecrease={() => handleQuantityChange(item.id, item.quantity - 1, item.size, item.color)}
-              onRemove={() => handleRemove(item.id, item.size, item.color)}
+              onIncrease={() => handleQuantityChange(item.id, item.quantity + 1)}
+              onDecrease={() => handleQuantityChange(item.id, item.quantity - 1)}
+              onRemove={() => handleRemove(item.id)}
             />
           );
         })}

@@ -54,6 +54,12 @@ const AddProduct = () => {
         price: parseFloat(form.price),
         stock: parseInt(form.stock),
         sizes: form.sizes.split(",").map((s) => s.trim()),
+        images: form.images.map((url) => ({ url })), // ✅ transform product-level images
+        colors: form.colors.map((color) => ({
+          name: color.name,
+          value: color.value,
+          images: color.images.map((url) => ({ url })), // ✅ transform nested color images
+        })),
       });
       toast.success("Product added!");
       navigate("/products");

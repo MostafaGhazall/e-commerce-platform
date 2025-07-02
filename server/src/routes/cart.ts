@@ -16,7 +16,12 @@ router.get("/", authenticate, async (req: AuthRequest, res, next) => {
         items: {
           include: {
             product: {
-              include: { images: true, colors: true },
+              include: {
+                images: true,
+                colors: {
+                  include: { images: true },
+                },
+              },
             },
           },
         },
@@ -44,7 +49,9 @@ router.post("/", authenticate, async (req: AuthRequest, res, next) => {
     }
 
     // Check if product exists
-    const product = await prisma.product.findUnique({ where: { id: productId } });
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    });
     if (!product) {
       res.status(404).json({ message: "Product not found" });
       return;
@@ -129,21 +136,25 @@ router.patch("/:itemId", authenticate, async (req: AuthRequest, res, next) => {
  * ✅ DELETE /cart/clear/all
  * Deletes all items in the current user's cart.
  */
-router.delete("/clear/all", authenticate, async (req: AuthRequest, res, next) => {
-  try {
-    const cart = await prisma.cart.findFirst({
-      where: { userId: req.userId },
-    });
+router.delete(
+  "/clear/all",
+  authenticate,
+  async (req: AuthRequest, res, next) => {
+    try {
+      const cart = await prisma.cart.findFirst({
+        where: { userId: req.userId },
+      });
 
-    if (cart) {
-      await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+      if (cart) {
+        await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+      }
+
+      res.status(204).end();
+    } catch (err) {
+      next(err);
     }
-
-    res.status(204).end();
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * ✅ DELETE /cart/:itemId

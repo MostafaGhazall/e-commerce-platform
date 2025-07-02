@@ -4,6 +4,6 @@ import { authenticateAdmin } from "../middleware/adminAuth";
 
 const router = Router();
 
-router.get("/", authenticateAdmin, getDashboardStats);
+router.get("/dashboard", authenticateAdmin, getDashboardStats);
 
 export default router;

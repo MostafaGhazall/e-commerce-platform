@@ -26,8 +26,12 @@ router.post(
             include: {
               product: {
                 include: {
-                  images: true,
-                  colors: true,
+                  images: true, // fallback product-level images
+                  colors: {
+                    include: {
+                      images: true, // pull color-level images
+                    },
+                  },
                 },
               },
             },
@@ -53,16 +57,18 @@ router.post(
             address: shipping.address,
             city: shipping.city,
             region: shipping.region,
-            postalCode: shipping.postalCode,
+            postalcode: shipping.postalcode,
             country: shipping.country,
             phone: shipping.phone,
             items: {
               create: cart.items.map((item) => {
                 // pick color-specific image or fallback
                 const variantImageUrl =
-                  item.product.colors.find((c) => c.name === item.colorName)
-                    ?.images?.[0] ||
-                  item.product.images[0]?.url ||
+                  item.product.colors.find(
+                    (c) =>
+                      c.name.toLowerCase() === item.colorName?.toLowerCase()
+                  )?.images[0]?.url ??
+                  item.product.images[0]?.url ??
                   "/fallback.png";
 
                 return {
@@ -141,7 +147,7 @@ router.get("/", authenticate, async (req: AuthRequest, res, next) => {
           address: order.address,
           city: order.city,
           region: order.region,
-          postalCode: order.postalCode,
+          postalcode: order.postalcode,
           country: order.country,
         },
       }))
@@ -202,7 +208,7 @@ router.get("/:id", authenticate, async (req: AuthRequest, res, next) => {
         address: order.address,
         city: order.city,
         region: order.region,
-        postalCode: order.postalCode,
+        postalcode: order.postalcode,
         country: order.country,
       },
     });

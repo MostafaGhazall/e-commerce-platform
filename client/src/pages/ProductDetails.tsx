@@ -1,105 +1,44 @@
 import { useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useProductStore, addReviewToProduct } from "../contexts/useStore";
 import { useCartStore } from "../contexts/useCartStore";
 import { useWishlistStore } from "../contexts/useWishlistStore";
+import { useAuthStore } from "../contexts/useAuthStore";
+import { useUserStore } from "../contexts/useUserStore";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   Heart,
   HeartOff,
-  Star,
-  StarHalf,
-  Star as StarEmpty,
+  Star
 } from "lucide-react";
-import { useUserStore } from "../contexts/useUserStore";
-import { useTranslation } from "react-i18next";
 import type { Product } from "../types/Product";
-import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../contexts/useAuthStore";
-
 
 const ProductDetails = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { id } = useParams();
   const { products } = useProductStore();
   const product = products.find((p) => p.id === id);
-  const addToCart = useCartStore((state) => state.addToCart);
-  const toggleWishlist = useWishlistStore((state) => state.toggleWishlist);
-  const isWishlisted = useWishlistStore((state) =>
-    state.isWishlisted(product?.id || "")
-  );
   const { user } = useAuthStore();
-  const navigate = useNavigate();
+  const { firstName, lastName } = useUserStore();
 
-  const { firstName, lastName } = useUserStore(); // Get user profile from the store
+  const addToCart = useCartStore((s) => s.addToCart);
+  const toggleWishlist = useWishlistStore((s) => s.toggleWishlist);
+  const isWishlisted = useWishlistStore((s) =>
+    s.isWishlisted(product?.id ?? "")
+  );
+
+  const [selectedSize, setSelectedSize] = useState<string>();
+  type ColorOption = NonNullable<Product["colors"]>[number];
+  const [selectedColor, setSelectedColor] = useState<ColorOption>();
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const reviewsRef = useRef<HTMLDivElement>(null);
 
   const [newReview, setNewReview] = useState({
     rating: 0,
     comment: "",
   });
-
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      toast.error(t("productDetails.Please sign in to submit a review"));
-      navigate("/Login");
-      return;
-    }
-    if (!newReview.rating || !newReview.comment.trim()) {
-      toast.error(
-        t("productDetails.Please provide both a rating and comment.")
-      ); // Toast translation
-      return;
-    }
-
-    if (!product) {
-      toast.error(t("productDetails.Product not found.")); // Toast translation
-      return;
-    }
-
-    const review = {
-      comment: newReview.comment,
-      name:
-        firstName && lastName
-          ? `${firstName} ${lastName}`
-          : t("productDetails.Anonymous"),
-      rating: newReview.rating,
-      date: new Date().toLocaleDateString(),
-    };
-
-    try {
-      const savedReview = await addReviewToProduct(product.id, {
-        comment: review.comment,
-        name: review.name,
-        rating: review.rating,
-      });
-
-      product.reviews.push(savedReview); // Push backend-confirmed version
-
-      setNewReview({ rating: 0, comment: "" });
-      toast.success(t("productDetails.Review submitted!")); // Toast translation
-    } catch {
-      toast.error(t("productDetails.Failed to submit review.")); // Toast translation
-    }
-  };
-
-  const handleToggleWishlist = () => {
-    if (!user) {
-      toast.error(t("productDetails.Please sign in to manage wishlist"));
-      navigate("/Login");
-      return;
-    }
-
-    if (!product) return;
-
-    toggleWishlist(product.id);
-  };
-
-  const [selectedSize, setSelectedSize] = useState<string | undefined>();
-  type ColorOption = NonNullable<Product["colors"]>[number];
-  const [selectedColor, setSelectedColor] = useState<ColorOption>();
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const reviewsRef = useRef<HTMLDivElement>(null);
 
   if (!product) {
     return (
@@ -125,41 +64,87 @@ const ProductDetails = () => {
       navigate("/Login");
       return;
     }
-
-    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+    if (product.sizes.length && !selectedSize) {
       toast.error(t("productDetails.Please select a size."));
       return;
     }
-    if (product.colors && product.colors.length > 0 && !selectedColor) {
+    if (product.colors.length && !selectedColor) {
       toast.error(t("productDetails.Please select a color."));
       return;
     }
 
     addToCart({
-      id: product.id,
-      name: product.name,
-      image:
-        selectedColor?.images?.[selectedImageIndex]?.url ??
-        product.images[selectedImageIndex]?.url,
-
-      price: product.price,
+      productId: product.id,
       quantity: 1,
       size: selectedSize,
       color: selectedColor?.value,
       colorName: selectedColor?.name,
-    });
+    })
+      .then(() =>
+        toast.success(`${product.name} ${t("productDetails.added to cart!")}`)
+      )
+      .catch(() => toast.error(t("productDetails.Add to cart failed.")));
+  };
 
-    toast.success(`${product.name} ${t("productDetails.added to cart!")}`);
+  const handleToggleWishlist = async () => {
+    if (!user) {
+      toast.error(t("productDetails.Please sign in to manage wishlist"));
+      navigate("/Login");
+      return;
+    }
+
+    await toggleWishlist(product.id);
+
+    const updated = useWishlistStore.getState().isWishlisted(product.id);
+    toast.success(
+      updated
+        ? t("productDetails.Added to wishlist")
+        : t("productDetails.Removed from wishlist")
+    );
+  };
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error(t("productDetails.Please sign in to submit a review"));
+      navigate("/Login");
+      return;
+    }
+    if (!newReview.rating || !newReview.comment.trim()) {
+      toast.error(
+        t("productDetails.Please provide both a rating and comment.")
+      );
+      return;
+    }
+
+    const reviewPayload = {
+      comment: newReview.comment,
+      name:
+        firstName && lastName
+          ? `${firstName} ${lastName}`
+          : t("productDetails.Anonymous"),
+      rating: newReview.rating,
+      date: new Date().toISOString(),
+    };
+
+    try {
+      const saved = await addReviewToProduct(product.id, reviewPayload);
+      product.reviews.push(saved);
+      setNewReview({ rating: 0, comment: "" });
+      toast.success(t("productDetails.Review submitted!"));
+    } catch {
+      toast.error(t("productDetails.Failed to submit review."));
+    }
   };
 
   const renderStars = (rating: number) => {
-    const fullStars = Math.floor(rating);
-    const hasHalf = rating - fullStars >= 0.5;
-    const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
+    const full = Math.floor(rating);
+    const half = rating - full >= 0.5;
+    const empty = 5 - full - (half ? 1 : 0);
 
     return (
-      <>
-        {[...Array(fullStars)].map((_, i) => (
+      <div className="flex gap-1">
+        {[...Array(full)].map((_, i) => (
           <Star
             key={`full-${i}`}
             className="w-5 h-5 text-[var(--primary-sun)]"
@@ -167,23 +152,43 @@ const ProductDetails = () => {
             stroke="currentColor"
           />
         ))}
-        {hasHalf && (
-          <StarHalf
+
+        {half && (
+          <span
             key="half"
-            className="w-5 h-5 text-[var(--primary-sun)]"
-            fill="currentColor"
-            stroke="currentColor"
-          />
+            className="relative w-5 h-5 inline-block"
+            dir="ltr" // fix for RTL flipped icons
+          >
+            {/* Full Star base as background */}
+            <Star
+              className="absolute top-0 left-0 w-5 h-5 text-[var(--primary-sun)]"
+              fill="none"
+              stroke="currentColor"
+            />
+            {/* Clipped half-filled star */}
+            <Star
+              className="absolute top-0 left-0 w-5 h-5 text-[var(--primary-sun)] overflow-hidden"
+              style={{
+                clipPath:
+                  document.dir === "rtl"
+                    ? "inset(0 0 0 50%)" // RTL: fill right half
+                    : "inset(0 50% 0 0)", // LTR: fill left half
+              }}
+              fill="currentColor"
+              stroke="currentColor"
+            />
+          </span>
         )}
-        {[...Array(emptyStars)].map((_, i) => (
-          <StarEmpty
+
+        {[...Array(empty)].map((_, i) => (
+          <Star
             key={`empty-${i}`}
             className="w-5 h-5 text-[var(--primary-sun)]"
             fill="none"
             stroke="currentColor"
           />
         ))}
-      </>
+      </div>
     );
   };
 
@@ -230,7 +235,7 @@ const ProductDetails = () => {
                   ? t("productDetails.Remove from wishlist")
                   : t("productDetails.Add to wishlist")
               }
-              className="text-gray-500 hover:text-red-500"
+              className="text-gray-500 hover:text-red-500 cursor-pointer"
             >
               {isWishlisted ? (
                 <Heart className="w-6 h-6 text-red-500" fill="currentColor" />
@@ -239,7 +244,6 @@ const ProductDetails = () => {
               )}
             </button>
           </div>
-
           <p className="text-2xl font-bold text-gray-800 mb-2">
             EGP {product.price.toFixed(2)}
           </p>
@@ -257,7 +261,6 @@ const ProductDetails = () => {
               ({product.reviews.length} {t("productDetails.verifiedRatings")})
             </button>
           </div>
-
           {/* Sizes */}
           {product.sizes && product.sizes.length > 0 && (
             <div className="mb-4">
@@ -281,7 +284,6 @@ const ProductDetails = () => {
               </div>
             </div>
           )}
-
           {/* Colors */}
           {product.colors && product.colors.length > 0 && (
             <div className="mb-4">
@@ -308,7 +310,6 @@ const ProductDetails = () => {
               </div>
             </div>
           )}
-
           <button
             onClick={handleAdd}
             className="bg-[var(--primary-sun)] hover:bg-yellow-300 text-black w-full px-6 py-3 mt-4 rounded transition flex items-center justify-center gap-2 cursor-pointer"
@@ -355,8 +356,10 @@ const ProductDetails = () => {
               </div>
               <p className="text-gray-800 mb-1">{r.comment}</p>
               <p className="text-xs text-gray-500">
-                {new Date(r.createdAt).toLocaleDateString()} by{" "}
-                {r.name || t("productDetails.Anonymous")}
+                {t("productDetails.reviewBy", {
+                  name: r.name || t("productDetails.Anonymous"),
+                  date: new Date(r.date).toLocaleDateString(),
+                })}
               </p>
             </li>
           ))}

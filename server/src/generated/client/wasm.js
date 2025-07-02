@@ -145,7 +145,8 @@ exports.Prisma.UserScalarFieldEnum = {
   lastName: 'lastName',
   phone: 'phone',
   postalcode: 'postalcode',
-  region: 'region'
+  region: 'region',
+  tokenVersion: 'tokenVersion'
 };
 
 exports.Prisma.ProductScalarFieldEnum = {
@@ -168,11 +169,16 @@ exports.Prisma.ImageScalarFieldEnum = {
   productId: 'productId'
 };
 
+exports.Prisma.ColorImageScalarFieldEnum = {
+  id: 'id',
+  url: 'url',
+  colorId: 'colorId'
+};
+
 exports.Prisma.ColorScalarFieldEnum = {
   id: 'id',
   name: 'name',
   value: 'value',
-  images: 'images',
   productId: 'productId'
 };
 
@@ -228,7 +234,7 @@ exports.Prisma.OrderScalarFieldEnum = {
   email: 'email',
   name: 'name',
   phone: 'phone',
-  postalCode: 'postalCode',
+  postalcode: 'postalcode',
   region: 'region'
 };
 
@@ -265,6 +271,7 @@ exports.Prisma.ModelName = {
   User: 'User',
   Product: 'Product',
   Image: 'Image',
+  ColorImage: 'ColorImage',
   Color: 'Color',
   Review: 'Review',
   Cart: 'Cart',

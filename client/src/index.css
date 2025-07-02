@@ -48,5 +48,11 @@
   .animate-slide-up {
     animation: slide-up 300ms ease-out forwards;
   }
+
+  /* Flip for RTL icons */
+  [dir="rtl"] .rotate-y-180 {
+    transform: scaleX(-1);
+  }
+
 }
 

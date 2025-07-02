@@ -65,7 +65,10 @@
     "Remove from wishlist": "Remove from wish list",
     "Please sign in to add to cart": "Please sign in to add to cart",
     "Please sign in to manage wishlist": "Please sign in to manage your wishlist",
-    "Please sign in to submit a review": "Please sign in to submit a review"
+    "Please sign in to submit a review": "Please sign in to submit a review",
+    "Added to wishlist": "Added to wishlist",
+    "Removed from wishlist": "Removed from wishlist",
+    "reviewBy": "by {{name}} {{date}}"
   },
 
   "footer": {
@@ -192,11 +195,13 @@
     "shippingAddress": "Shipping Address",
     "city": "City",
     "region": "Region",
-    "postalCode": "Postal Code",
+    "postalcode": "Postal Code",
     "country": "Country",
     "phoneNumber": "Phone Number",
     "useAsBilling": "Use as Billing Address",
-    "orderSuccess": "Order placed successfully!"
+    "orderSuccess": "Order placed successfully!",
+    "emptyCart": "Your cart is empty. Redirecting...",
+    "loading": "Loading checkout..."
   },
   "errors": {
     "nameRequired": "Name is required",
@@ -209,11 +214,12 @@
     "regionRequired": "Region is Required",
     "postalCodeRequired": "Postal Code is Required",
     "phoneInvalid": "Invalid phone number",
-    "pleaseFillRequiredFields": "Please fill in all required fields"
+    "pleaseFillRequiredFields": "Please fill in all required fields",
+    "failedOrder": "Failed to place order. Try again."
   },
 
   "orders": {
-    "noOrders": "No Orders",
+    "noOrdersFound": "No Orders Found",
     "orderHistory": "Order History",
     "orderID": "Order ID",
     "quantity": "Quantity",
@@ -228,7 +234,16 @@
     "shippingAddress": "Shipping Address",
     "orderSummary": "Order Summary",
     "total": "Total",
-    "close": "Close"
+    "close": "Close",
+    "loading": "Loading orders...",
+    "date": "Date",
+    "status": "Status",
+    "paymentMethod": "Payment Method",
+    "estimatedProgress": "Estimated Progress",
+    "name": "Name",
+    "phone": "Phone",
+    "email": "Email",
+    "address": "Address"
   },
 
   "userProfile": {
@@ -244,7 +259,7 @@
     "phone": "Phone",
     "cancel": "Cancel",
     "saveAddress": "Save Address",
-    "address":"Address",
-    "noAddress":"No Address"
+    "address": "Address",
+    "noAddress": "No Address"
   }
 }

@@ -94,7 +94,7 @@ const Home = () => {
         ].map((cat, i) => (
           <div
             key={i}
-            className="flex items-center justify-between bg-[var(--primary-sun)] rounded-lg shadow hover:shadow-lg transform hover:scale-105 transition duration-300 cursor-pointer p-7"
+            className="flex items-center justify-between bg-[var(--primary-sun)] rounded-lg shadow hover:shadow-lg transform hover:scale-105 transition duration-300 p-7"
           >
             <div className="flex flex-col text-center flex-1">
               <h3 className="text-2xl font-bold text-gray-900">{cat.title}</h3>

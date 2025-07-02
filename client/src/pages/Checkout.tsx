@@ -1,143 +1,157 @@
+import { useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
 import { useCartStore } from "../contexts/useCartStore";
 import { useProductStore } from "../contexts/useStore";
-import { useUserStore } from "../contexts/useUserStore"; // Autofill feature
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
-import { useTranslation } from "react-i18next";
-import { useOrderStore } from "../contexts/useOrderStore";
+import { useUserStore } from "../contexts/useUserStore";
+import { checkoutSchema, CheckoutInput } from "../../../shared/userValidators";
+import axios from "../api/axios";
 
-const Checkout = () => {
-  const { cart, clearCart } = useCartStore();
-  const { products, loadProducts } = useProductStore();
-  const {
-    firstName,
-    lastName,
-    email,
-    address,
-    city,
-    country,
-    postalcode,
-    region,
-    phone,
-  } = useUserStore(); // User data
+export default function Checkout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { addOrder } = useOrderStore();
 
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({
-    name: `${firstName} ${lastName}`.trim(),
-    email: email,
-    address: address,
-    country: country || "",
-    city: city || "",
-    region: region || "",
-    postalCode: postalcode || "",
-    phone: phone || "",
-    paymentMethod: "cash-on-delivery", // Default payment method
-  });
+  /* stores ----------------------------------------------------- */
+  const { cart, fetchCart, clearCart } = useCartStore();
+  const { products, loadProducts } = useProductStore();
+  const user = useUserStore();
 
   useEffect(() => {
-    if (products.length === 0) loadProducts();
-  }, [products, loadProducts]);
+    if (cart.length === 0) fetchCart();
+  }, [cart.length, fetchCart]);
 
-  const getProduct = (id: string) => products.find((p) => p.id === id);
+  /* load products once ---------------------------------------- */
+  useEffect(() => {
+    (async () => {
+      await loadProducts();
+    })();
+  }, []);
 
-  const total = cart.reduce((sum, item) => {
-    const product = getProduct(item.id);
-    return sum + (product?.price ?? 0) * item.quantity;
-  }, 0);
+  /* helpers ---------------------------------------------------- */
+  const findProduct = (productId: string) =>
+    products.find((p) => p.id === productId);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const subtotal = useMemo(
+    () => cart.reduce((sum, line) => sum + line.price * line.quantity, 0),
+    [cart]
+  );
 
-  const isValidEmail = (email: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  /* form ------------------------------------------------------- */
+  const defaultValues = (): CheckoutInput => ({
+    name: `${user.firstName} ${user.lastName}`.trim(),
+    email: user.email,
+    address: user.address,
+    country: user.country ?? "",
+    city: user.city ?? "",
+    region: user.region ?? "",
+    postalcode: user.postalcode ?? "",
+    phone: user.phone ?? "",
+  });
 
-  const isValidPhone = (phone: string) => /^\+?\d{6,15}$/.test(phone);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setFocus,
+    formState: { errors },
+  } = useForm<CheckoutInput>({
+    resolver: zodResolver(checkoutSchema),
+    defaultValues: defaultValues(),
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  /* repopulate when user profile updates ---------------------- */
+  useEffect(() => reset(defaultValues()), [user, reset]);
 
-    const errors: Record<string, string> = {};
-    if (!form.name) errors.name = t("errors.nameRequired");
-    if (!form.email) {
-      errors.email = t("errors.emailRequired");
-    } else if (!isValidEmail(form.email)) {
-      errors.email = t("errors.emailInvalid");
+  /* focus first error ----------------------------------------- */
+  useEffect(() => {
+    const firstErr = Object.keys(errors)[0] as keyof CheckoutInput | undefined;
+    if (firstErr) setFocus(firstErr);
+  }, [errors, setFocus]);
+
+  /* submit ----------------------------------------------------- */
+  const onSubmit = handleSubmit(async (data) => {
+    if (!cart.length) {
+      toast.error(t("checkout.emptyCart"));
+      return navigate("/cart");
     }
 
-    if (!form.address) errors.address = t("errors.addressRequired");
-    if (!form.country) errors.country = t("errors.countryRequired");
-    if (!form.city) errors.city = t("errors.cityRequired");
-    if (!form.region) errors.region = t("errors.regionRequired");
-    if (!form.postalCode) errors.postalCode = t("errors.postalCodeRequired");
-    if (!form.phone) {
-      errors.phone = t("errors.phoneRequired");
-    } else if (!isValidPhone(form.phone)) {
-      errors.phone = t("errors.phoneInvalid");
-    }
-
-    setFormErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      const firstErrorField = Object.keys(errors)[0];
-      document.querySelector(`input[name="${firstErrorField}"]`)?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
-    if (Object.keys(errors).length > 0) return;
-
-    const orderItems = cart.map((item) => {
-      const product = getProduct(item.id);
-      return {
-        id: item.id,
-        name: product?.name || "",
-        price: product?.price || 0,
-        quantity: item.quantity,
-        size: item.size,
-        color: item.color,
-        colorName: item.colorName,
-        image: item.image || product?.images?.[0] || "/fallback.png",
+    try {
+      const payload = {
+        items: cart.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          size: item.size,
+          color: item.color,
+          colorName: item.colorName,
+        })),
+        total: subtotal,
+        shipping: {
+          name: data.name,
+          email: data.email,
+          address: data.address,
+          city: data.city,
+          country: data.country,
+          region: data.region,
+          postalcode: data.postalcode,
+          phone: data.phone,
+        },
       };
-    });
 
-    const newOrder = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString(),
-      items: orderItems,
-      total,
-      shipping: form,
-    };
+      await axios.post("/orders", payload, { withCredentials: true });
 
-    addOrder(newOrder);
-    toast.success(t("checkout.orderSuccess") || "Order placed successfully!");
-    clearCart();
-    navigate("/orderhistory");
-  };
+      toast.success(t("checkout.orderSuccess"));
+      setTimeout(() => navigate("/orderhistory"), 500);
+      clearCart();
+      navigate("/orderhistory");
+    } catch (error: any) {
+      console.error("Order submission failed", error);
+      toast.error(t("errors.failedOrder") || "Failed to place order.");
+    }
+  });
+
+  if (!products.length) {
+    return (
+      <div className="text-center py-20 text-lg">
+        {t("checkout.loading") || "Loading..."}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-2 gap-10 text-gray-800 bg-white">
-      {/* Order Summary - Appears First on Mobile */}
-      <div className="order-1 lg:order-2 space-y-4 bg-gray-50 rounded-2xl px-6 py-6">
+      {/* Order Summary (mobile first) */}
+      <section className="order-1 lg:order-2 space-y-4 bg-gray-50 rounded-2xl px-6 py-6">
         <h3 className="text-xl font-semibold">{t("checkout.orderSummary")}</h3>
+
+        {/* cart lines */}
         <ul className="space-y-4">
           {cart.map((item) => {
-            const product = getProduct(item.id);
+            const product = findProduct(item.productId);
             if (!product) return null;
 
             return (
               <li
-                key={`${item.id}-${item.size || "default"}`}
-                className="flex justify-between items-start border-b pb-4 gap-4"
+                key={`${item.id}-${item.size ?? "default"}`}
+                className="flex items-start gap-4 border-b pb-4"
               >
+                {/* image */}
                 <img
-                  src={item.image}
+                  src={
+                    item.image ??
+                    product.images[0]?.url ??
+                    "/images/fallback.png"
+                  }
                   alt={product.name}
-                  className="w-16 h-16 object-contain rounded-md border"
+                  className="w-14 h-14 object-contain rounded-md border shrink-0"
                 />
-                <div className="flex flex-col space-y-2">
-                  <h4 className="font-medium">{product.name}</h4>
+
+                {/* details */}
+                <div className="flex-1 space-y-0.5">
+                  <h4 className="font-medium leading-snug">{product.name}</h4>
                   <p className="text-sm text-gray-500 line-clamp-2">
                     {product.description}
                   </p>
@@ -153,13 +167,15 @@ const Checkout = () => {
                     <p className="text-xs text-gray-500 flex items-center gap-1">
                       {t("checkout.color")}:
                       <span
-                        className="inline-block w-4 h-4 rounded-full border ml-1"
+                        className="inline-block w-4 h-4 rounded-full border"
                         style={{ backgroundColor: item.color }}
-                      ></span>
+                      />
                     </p>
                   )}
                 </div>
-                <span className="font-semibold text-lg">
+
+                {/* line total */}
+                <span className="text-lg font-semibold whitespace-nowrap">
                   EGP {(product.price * item.quantity).toFixed(2)}
                 </span>
               </li>
@@ -167,66 +183,64 @@ const Checkout = () => {
           })}
         </ul>
 
-        <div className="flex justify-between font-medium text-lg mt-6 border-t pt-4">
-          <span>{t("checkout.subtotal")}</span>
-          <span>EGP {total.toFixed(2)}</span>
-        </div>
-
-        <div className="flex justify-between font-medium text-lg mt-2">
-          <span>{t("checkout.deliveryCharge")}</span>
-          <span>{t("checkout.free")}</span>
-        </div>
-
-        <div className="flex justify-between font-medium text-lg mt-2">
-          <span>{t("checkout.tax")}</span>
-          <span>{t("checkout.included")}</span>
+        {/* totals */}
+        <div className="mt-6 space-y-2 border-t pt-4 text-lg font-medium">
+          <div className="flex justify-between">
+            <span>{t("checkout.subtotal")}</span>
+            <span>EGP {subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>{t("checkout.deliveryCharge")}</span>
+            <span>{t("checkout.free")}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>{t("checkout.tax")}</span>
+            <span>{t("checkout.included")}</span>
+          </div>
         </div>
 
         <div className="flex justify-between font-bold text-xl mt-4">
           <span>{t("checkout.total")}</span>
-          <span>EGP {total.toFixed(2)}</span>
+          <span>EGP {subtotal.toFixed(2)}</span>
         </div>
 
-        <div className="mt-4 text-sm text-gray-500">
-          <span className="italic">{t("checkout.arrivalTime")}</span>
-        </div>
-      </div>
+        <p className="mt-4 text-sm text-gray-500 italic">
+          {t("checkout.arrivalTime")}
+        </p>
+      </section>
 
-      {/* Checkout Form - Appears Second on Mobile */}
-      <div className="order-2 lg:order-1 space-y-6">
-        <h2 className="text-2xl font-bold mb-4">{t("checkout.title")}</h2>
-        <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6">
+      {/* Checkout form */}
+      <section className="order-2 lg:order-1 space-y-6">
+        <h2 className="text-2xl font-bold">{t("checkout.title")}</h2>
+
+        <form id="checkout-form" onSubmit={onSubmit} className="space-y-6">
           {/* Contact Information */}
           <div className="bg-gray-50 p-4 rounded-md space-y-4">
             <h3 className="text-xl font-semibold">
               {t("checkout.contactInfo")}
             </h3>
+
             <input
-              name="name"
-              type="text"
-              placeholder={t("checkout.fullName") || "Full Name"}
-              value={form.name}
-              onChange={handleChange}
+              {...register("name")}
+              placeholder={t("checkout.fullName")}
               className={`w-full border px-4 py-2 rounded bg-white ${
-                formErrors.name ? "border-red-500" : ""
+                errors.name && "border-red-500"
               }`}
             />
-            {formErrors.name && (
-              <p className="text-red-500 text-sm">{formErrors.name}</p>
+            {errors.name && (
+              <p className="text-red-500 text-sm">{errors.name.message}</p>
             )}
 
             <input
-              name="email"
+              {...register("email")}
               type="email"
-              placeholder={t("checkout.email") || "Email"}
-              value={form.email}
-              onChange={handleChange}
+              placeholder={t("checkout.email")}
               className={`w-full border px-4 py-2 rounded bg-white ${
-                formErrors.email ? "border-red-500" : ""
+                errors.email && "border-red-500"
               }`}
             />
-            {formErrors.email && (
-              <p className="text-red-500 text-sm">{formErrors.email}</p>
+            {errors.email && (
+              <p className="text-red-500 text-sm">{errors.email.message}</p>
             )}
           </div>
 
@@ -236,170 +250,104 @@ const Checkout = () => {
               {t("checkout.shippingInfo")}
             </h3>
 
-            {/* Address */}
-            <div>
-              <input
-                name="address"
-                type="text"
-                placeholder={
-                  t("checkout.shippingAddress") || "Shipping Address"
-                }
-                value={form.address}
-                onChange={handleChange}
-                className={`w-full border px-4 py-2 rounded bg-white ${
-                  formErrors.address ? "border-red-500" : ""
-                }`}
-              />
-              {formErrors.address && (
-                <p className="text-red-500 text-sm mt-1">
-                  {formErrors.address}
-                </p>
-              )}
-            </div>
+            <input
+              {...register("address")}
+              placeholder={t("checkout.shippingAddress")}
+              className={`w-full border px-4 py-2 rounded bg-white ${
+                errors.address && "border-red-500"
+              }`}
+            />
+            {errors.address && (
+              <p className="text-red-500 text-sm">{errors.address.message}</p>
+            )}
 
-            {/* Grid Inputs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <input
-                  name="city"
-                  type="text"
-                  placeholder={t("checkout.city")}
-                  value={form.city}
-                  onChange={handleChange}
-                  className={`w-full border px-4 py-2 rounded bg-white ${
-                    formErrors.city ? "border-red-500" : ""
-                  }`}
-                />
-                {formErrors.city && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.city}</p>
-                )}
-              </div>
-
-              <div>
-                <input
-                  name="region"
-                  type="text"
-                  placeholder={t("checkout.region")}
-                  value={form.region}
-                  onChange={handleChange}
-                  className={`w-full border px-4 py-2 rounded bg-white ${
-                    formErrors.region ? "border-red-500" : ""
-                  }`}
-                />
-                {formErrors.region && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.region}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <input
-                  name="postalCode"
-                  type="text"
-                  placeholder={t("checkout.postalCode")}
-                  value={form.postalCode}
-                  onChange={handleChange}
-                  className={`w-full border px-4 py-2 rounded bg-white ${
-                    formErrors.postalCode ? "border-red-500" : ""
-                  }`}
-                />
-                {formErrors.postalCode && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.postalCode}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <input
-                  name="country"
-                  type="text"
-                  placeholder={t("checkout.country")}
-                  value={form.country}
-                  onChange={handleChange}
-                  className={`w-full border px-4 py-2 rounded bg-white ${
-                    formErrors.country ? "border-red-500" : ""
-                  }`}
-                />
-                {formErrors.country && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.country}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div>
-              <input
-                name="phone"
-                type="text"
-                placeholder={t("checkout.phoneNumber") || "Phone Number"}
-                value={form.phone}
-                onChange={handleChange}
-                className={`w-full border px-4 py-2 rounded bg-white ${
-                  formErrors.phone ? "border-red-500" : ""
-                }`}
-              />
-              {formErrors.phone && (
-                <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>
+              {(["city", "region", "postalcode", "country"] as const).map(
+                (field) => (
+                  <div key={field}>
+                    <input
+                      {...register(field)}
+                      placeholder={t(`checkout.${field}`)}
+                      className={`w-full border px-4 py-2 rounded bg-white ${
+                        errors[field] && "border-red-500"
+                      }`}
+                    />
+                    {errors[field] && (
+                      <p className="text-red-500 text-sm">
+                        {errors[field]!.message}
+                      </p>
+                    )}
+                  </div>
+                )
               )}
             </div>
 
-            {/* Billing Checkbox */}
-            <div className="flex items-center">
+            <input
+              {...register("phone")}
+              placeholder={t("checkout.phoneNumber")}
+              className={`w-full border px-4 py-2 rounded bg-white ${
+                errors.phone && "border-red-500"
+              }`}
+            />
+            {errors.phone && (
+              <p className="text-red-500 text-sm">{errors.phone.message}</p>
+            )}
+
+            {/* Visual-only checkbox */}
+            <label className="flex items-center">
               <input type="checkbox" className="mr-2" />
-              <span>{t("checkout.useAsBilling")}</span>
-            </div>
+              {t("checkout.useAsBilling")}
+            </label>
           </div>
 
-          {/* Payment Method */}
+          {/* Payment (static) */}
           <div className="bg-gray-50 p-4 rounded-md space-y-4">
             <h3 className="text-xl font-semibold">
               {t("checkout.paymentMethod")}
             </h3>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {["cash-on-delivery", "master-card", "paypal", "visa"].map(
-                (paymentOption) => (
-                  <div
-                    key={paymentOption}
-                    className="flex flex-row gap-3 items-center border p-4 rounded-md hover:shadow"
+                (option) => (
+                  <label
+                    key={option}
+                    className={`flex flex-row gap-3 items-center border p-4 rounded-md ${
+                      option === "cash-on-delivery"
+                        ? "bg-yellow-50 border-yellow-400"
+                        : "opacity-40"
+                    }`}
                   >
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value={paymentOption}
-                      onChange={handleChange}
-                      checked={form.paymentMethod === paymentOption}
-                      className="w-4 h-4 cursor-pointer"
+                      value={option}
+                      defaultChecked={option === "cash-on-delivery"}
+                      disabled
+                      className="w-4 h-4 cursor-not-allowed"
                     />
                     <img
-                      src={`/images/${paymentOption
-                        .toLowerCase()
-                        .replace(/ /g, "-")}.png`}
-                      alt={paymentOption}
+                      src={`/images/${option}.png`}
+                      alt={option}
                       className="w-16 h-16 object-contain"
                     />
-                  </div>
+                  </label>
                 )
               )}
             </div>
           </div>
         </form>
-      </div>
+      </section>
 
-      {/* Submit Button - Appears Last on Mobile, Still Submits Form */}
+      {/* Place Order button */}
       <div className="order-3 lg:col-span-2 flex justify-center mt-4">
         <button
           type="submit"
           form="checkout-form"
-          className="bg-[var(--primary-sun)] text-black px-6 py-2 rounded hover:bg-yellow-300 w-full max-w-sm cursor-pointer"
+          className="bg-[var(--primary-sun)] hover:bg-yellow-300 text-black px-6 py-2 rounded w-full max-w-sm cursor-pointer"
         >
           {t("checkout.placeOrder")}
         </button>
       </div>
     </div>
   );
-};
-export default Checkout;
+}

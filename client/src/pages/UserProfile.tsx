@@ -2,6 +2,11 @@ import { useTranslation } from "react-i18next";
 import { useUserStore } from "../contexts/useUserStore";
 import { useForm } from "react-hook-form";
 import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  updateProfileSchema,
+  UpdateProfileInput,
+} from "../../../shared/userValidators";
 
 export default function UserProfile() {
   const { t } = useTranslation();
@@ -16,16 +21,18 @@ export default function UserProfile() {
     country,
     phone,
     birthday,
-    gender,
-    updateUserProfile,
+    saveUserProfile,
   } = useUserStore();
+
+  const [editingAddress, setEditingAddress] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm({
+  } = useForm<UpdateProfileInput>({
+    resolver: zodResolver(updateProfileSchema),
     defaultValues: {
       address,
       city,
@@ -33,22 +40,14 @@ export default function UserProfile() {
       postalcode,
       country,
       phone,
+      birthday,
     },
   });
 
-  const onSubmit = (data: any) => {
-    updateUserProfile({
-      firstName,
-      lastName,
-      email,
-      birthday,
-      gender,
-      ...data,
-    });
+  const onSubmit = async (data: UpdateProfileInput) => {
+    await saveUserProfile(data);
     setEditingAddress(false);
   };
-
-  const [editingAddress, setEditingAddress] = useState(false);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
@@ -77,7 +76,9 @@ export default function UserProfile() {
           </h2>
           {!editingAddress ? (
             <>
-              <p className="mb-4 text-gray-600">{address || t("userProfile.noAddress")}</p>
+              <p className="mb-4 text-gray-600">
+                {address || t("userProfile.noAddress")}
+              </p>
               <button
                 onClick={() => {
                   setEditingAddress(true);
@@ -85,91 +86,109 @@ export default function UserProfile() {
                 }}
                 className="text-[var(--primary-amber)] font-medium hover:cursor-pointer"
               >
-                {address ? t("userProfile.editAddress") : t("userProfile.addAddress")}
+                {address
+                  ? t("userProfile.editAddress")
+                  : t("userProfile.addAddress")}
               </button>
             </>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* Address */}
               <div>
                 <label className="block text-sm text-gray-700">
                   {t("userProfile.address")}
                 </label>
                 <input
-                  {...register("address", { required: t("userProfile.addressRequired") })}
+                  {...register("address")}
                   className="w-full border border-gray-300 px-4 py-2 rounded mt-1"
                 />
                 {errors.address && (
-                  <p className="text-sm text-red-600 mt-1">{errors.address.message}</p>
+                  <p className="text-sm text-red-600 mt-1">
+                    {errors.address.message}
+                  </p>
                 )}
               </div>
 
+              {/* City, Region, Postal, Country */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-700">{t("userProfile.city")}</label>
+                  <label className="block text-sm text-gray-700">
+                    {t("userProfile.city")}
+                  </label>
                   <input
-                    {...register("city", { required: t("userProfile.cityRequired") })}
+                    {...register("city")}
                     className="w-full border border-gray-300 px-4 py-2 rounded mt-1"
                   />
                   {errors.city && (
-                    <p className="text-sm text-red-600 mt-1">{errors.city.message}</p>
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.city.message}
+                    </p>
                   )}
                 </div>
+
                 <div>
-                  <label className="block text-sm text-gray-700">{t("userProfile.region")}</label>
+                  <label className="block text-sm text-gray-700">
+                    {t("userProfile.region")}
+                  </label>
                   <input
-                    {...register("region", { required: t("userProfile.regionRequired") })}
+                    {...register("region")}
                     className="w-full border border-gray-300 px-4 py-2 rounded mt-1"
                   />
                   {errors.region && (
-                    <p className="text-sm text-red-600 mt-1">{errors.region.message}</p>
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.region.message}
+                    </p>
                   )}
                 </div>
+
                 <div>
                   <label className="block text-sm text-gray-700">
                     {t("userProfile.postalCode")}
                   </label>
                   <input
-                    {...register("postalcode", {
-                      required: t("userProfile.postalCodeRequired"),
-                      pattern: {
-                        value: /^[0-9]{3,10}$/,
-                        message: t("userProfile.postalCodePattern"),
-                      },
-                    })}
+                    {...register("postalcode")}
                     className="w-full border border-gray-300 px-4 py-2 rounded mt-1"
                   />
                   {errors.postalcode && (
-                    <p className="text-sm text-red-600 mt-1">{errors.postalcode.message}</p>
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.postalcode.message}
+                    </p>
                   )}
                 </div>
+
                 <div>
-                  <label className="block text-sm text-gray-700">{t("userProfile.country")}</label>
+                  <label className="block text-sm text-gray-700">
+                    {t("userProfile.country")}
+                  </label>
                   <input
-                    {...register("country", { required: t("userProfile.countryRequired") })}
+                    {...register("country")}
                     className="w-full border border-gray-300 px-4 py-2 rounded mt-1"
                   />
                   {errors.country && (
-                    <p className="text-sm text-red-600 mt-1">{errors.country.message}</p>
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.country.message}
+                    </p>
                   )}
                 </div>
               </div>
 
+              {/* Phone */}
               <div>
-                <label className="block text-sm text-gray-700">{t("userProfile.phone")}</label>
+                <label className="block text-sm text-gray-700">
+                  {t("userProfile.phone")}
+                </label>
                 <input
-                  {...register("phone", {
-                    pattern: {
-                      value: /^[0-9+\-\s]{6,15}$/,
-                      message: t("userProfile.phonePattern"),
-                    },
-                  })}
+                  {...register("phone")}
                   className="w-full border border-gray-300 px-4 py-2 rounded mt-1"
                 />
                 {errors.phone && (
-                  <p className="text-sm text-red-600 mt-1">{errors.phone.message}</p>
+                  <p className="text-sm text-red-600 mt-1">
+                    {errors.phone.message}
+                  </p>
                 )}
               </div>
 
+              {/* Buttons */}
               <div className="flex justify-end gap-4 mt-6">
                 <button
                   type="button"

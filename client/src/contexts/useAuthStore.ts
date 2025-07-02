@@ -1,98 +1,102 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import api from "../api/axios";
-
+import type { RegisterInput, LoginInput } from "../../../shared/userValidators";
 
 export interface AuthUser {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
 }
 
-export interface AuthResponse {
-  user: AuthUser;
-}
-
-// Register
-export const registerUser = async (name: string, email: string, password: string): Promise<AuthUser> => {
-  const { data } = await api.post<AuthResponse>("/auth/register", {
-    name,
-    email,
-    password,
-  });
-  return data.user;
-};
-
-// Login
-export const loginUser = async (email: string, password: string): Promise<AuthUser> => {
-  const { data } = await api.post<AuthResponse>("/auth/login", {
-    email,
-    password,
-  });
-  return data.user;
-};
-
-// Get Current User
-export const getCurrentUser = async (): Promise<AuthUser> => {
-  const { data } = await api.get<AuthResponse>("/auth/me");
-  return data.user;
-};
-
-// Logout
-export const logoutUser = async (): Promise<void> => {
-  await api.post("/auth/logout");
-};
-
-
 interface AuthState {
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  logout: () => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
+  login: (data: LoginInput) => Promise<{ ok: boolean; msg?: string }>;
+  register: (data: RegisterInput) => Promise<{ ok: boolean; msg?: string }>;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
 
-      login: async (email, password) => {
+      fetchCurrentUser: async () => {
         try {
-          const user = await loginUser(email, password);
-          set({ user });
-          return { success: true };
+          const { data } = await api.get("/auth/me", { withCredentials: true });
+          set({ user: data.user });
         } catch (err: any) {
-          return { success: false, message: err.response?.data?.message || "Login failed" };
+          set({ user: null });
+          if (err?.response?.status === 401) {
+            console.warn("Session expired, logging out...");
+            await get().logout();
+          }
         }
       },
 
-      register: async (name, email, password) => {
+      login: async (data) => {
         try {
-          const user = await registerUser(name, email, password);
-          set({ user });
-          return { success: true };
+          await api.post(
+            "/auth/login",
+            { email: data.email, password: data.password },
+            { withCredentials: true }
+          );
+          await get().fetchCurrentUser();
+          return { ok: true };
         } catch (err: any) {
-          return { success: false, message: err.response?.data?.message || "Registration failed" };
+          const msg =
+            err.response?.data?.error ||
+            err.response?.data?.message ||
+            "Login failed";
+          return { ok: false, msg };
+        }
+      },
+
+      register: async (data) => {
+        try {
+          await api.post(
+            "/auth/register",
+            {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              email: data.email,
+              password: data.password,
+              confirmPassword: data.confirmPassword,
+              agreeTerms: data.agreeTerms,
+            },
+            { withCredentials: true }
+          );
+          await get().fetchCurrentUser();
+          return { ok: true };
+        } catch (err: any) {
+          const msg = err.response?.data?.errors
+            ? Object.values(err.response.data.errors).flat().join(", ")
+            : err.response?.data?.error ||
+              err.response?.data?.message ||
+              "Registration failed";
+          return { ok: false, msg };
         }
       },
 
       logout: async () => {
-        await logoutUser();
-        set({ user: null });
-      },
-
-      fetchCurrentUser: async () => {
         try {
-          const user = await getCurrentUser();
-          set({ user });
+          await api.post("/auth/logout", {}, { withCredentials: true });
         } catch {
-          set({ user: null });
+          // ignore
         }
+        set({ user: null });
       },
     }),
     {
-      name: "auth-storage",
+      name: "auth",
+      partialize: (state) => ({ user: state.user }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.user) {
+          state.fetchCurrentUser();
+        }
+      },
     }
   )
 );

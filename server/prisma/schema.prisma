@@ -37,6 +37,7 @@ model User {
   cart       Cart?
   orders     Order[]
   wishlist   Wishlist?
+  tokenVersion  Int      @default(0)
 }
 
 model Product {
@@ -66,11 +67,18 @@ model Image {
   product   Product @relation(fields: [productId], references: [id])
 }
 
+model ColorImage {
+  id        String   @id @default(cuid())
+  url       String
+  colorId   String
+  color     Color    @relation(fields: [colorId], references: [id])
+}
+
 model Color {
   id        String   @id @default(cuid())
   name      String
   value     String
-  images    String[]
+  images    ColorImage[]
   productId String
   product   Product  @relation(fields: [productId], references: [id])
 }
@@ -80,7 +88,7 @@ model Review {
   comment   String
   name      String
   rating    Int
-  date      DateTime
+  date      DateTime @default(now())
   productId String
   product   Product  @relation(fields: [productId], references: [id])
 }
@@ -140,7 +148,7 @@ model Order {
   email         String
   name          String
   phone         String
-  postalCode    String
+  postalcode    String
   region        String
   user          User?        @relation(fields: [userId], references: [id])
   items         OrderItem[]

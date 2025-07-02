@@ -1,15 +1,19 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import {
   BrowserRouter as Router,
-  Route,
   Routes,
+  Route,
   Navigate,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { usePreferenceStore } from "./contexts/usePreferenceStore";
 import { useAuthStore } from "./contexts/useAuthStore";
+import { useUserStore } from "./contexts/useUserStore";
 import { useProductStore } from "./contexts/useStore";
+import { useWishlistStore } from "./contexts/useWishlistStore";
+import { useCartStore } from "./contexts/useCartStore";
 
+// pages & layout
 import Home from "./pages/Home";
 import ProductListing from "./pages/ProductListing";
 import ProductDetails from "./pages/ProductDetails";
@@ -21,31 +25,48 @@ import Wishlist from "./pages/Wishlist";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Contact from "./pages/Contact";
-
 import ScrollToTop from "./components/ScrollToTop";
 import Layout from "./components/Layout";
 
-const App = () => {
-  const language = usePreferenceStore((state) => state.language);
-  const user = useAuthStore((state) => state.user);
+/* protected gate, memoised so it never re-creates */
+const ProtectedRoute = memo(
+  ({ children }: { children: React.ReactElement }) => {
+    const user = useAuthStore((s) => s.user);
+    return user ? children : <Navigate to="/login" replace />;
+  }
+);
 
+export default function App() {
+  /* set RTL / LTR on html for Tailwind logical-direction classes */
+  const language = usePreferenceStore((s) => s.language);
   useEffect(() => {
-    document.documentElement.setAttribute(
-      "dir",
-      language === "ar" ? "rtl" : "ltr"
-    );
+    document.documentElement.lang = language === "ar" ? "ar" : "en";
+    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
   }, [language]);
 
-  useEffect(() => {
-    const load = async () => {
-      await useProductStore.getState().loadProducts();
-    };
-    load();
-  }, []);
+  /* hydrate auth session */
+  const fetchCurrentUser = useAuthStore((s) => s.fetchCurrentUser);
+  const authUser = useAuthStore((s) => s.user);
+  /* hydrate user profile */
+  const fetchUserProfile = useUserStore((s) => s.fetchUserProfile);
+  /* initial product load */
+  const loadProducts = useProductStore((s) => s.loadProducts);
 
-  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    return user ? children : <Navigate to="/login" replace />;
-  };
+  useEffect(() => {
+    fetchCurrentUser();
+    loadProducts();
+  }, [fetchCurrentUser, loadProducts]);
+
+  const fetchWishlist = useWishlistStore((s) => s.fetchWishlist);
+  const fetchCart = useCartStore((s) => s.fetchCart);
+
+  useEffect(() => {
+    if (authUser) {
+      fetchUserProfile();
+      fetchWishlist();
+      fetchCart();
+    }
+  }, [authUser, fetchUserProfile, fetchWishlist, fetchCart]);
 
   return (
     <Router>
@@ -57,11 +78,25 @@ const App = () => {
           <Route path="/products" element={<ProductListing />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/checkout" element={<Checkout />} />
-          <Route path="/orderhistory" element={<OrderHistory />} />
-          <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route
+            path="/orderhistory"
+            element={
+              <ProtectedRoute>
+                <OrderHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wishlist"
+            element={
+              <ProtectedRoute>
+                <Wishlist />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/cart"
             element={
@@ -78,10 +113,11 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* catch-all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     </Router>
   );
-};
-
-export default App;
+}

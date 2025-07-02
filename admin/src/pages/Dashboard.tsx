@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import adminApi from "../api/axios";
 
 interface Stats {
   totalOrders: number;
   totalRevenue: number;
   totalProducts: number;
+}
+
+function isValidStats(data: any): data is Stats {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    typeof data.totalOrders === "number" &&
+    typeof data.totalRevenue === "number" &&
+    typeof data.totalProducts === "number"
+  );
 }
 
 const Dashboard = () => {
@@ -14,10 +24,19 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await axios.get("/api/admin/dashboard", { withCredentials: true });
-        setStats(res.data);
+        const res = await adminApi.get("/api/admin/dashboard", {
+          withCredentials: true,
+        });
+
+        if (isValidStats(res.data)) {
+          setStats(res.data);
+        } else {
+          console.error("Invalid stats structure", res.data);
+          setStats(null); // fallback to show error UI
+        }
       } catch (err) {
         console.error("Failed to load dashboard stats", err);
+        setStats(null);
       } finally {
         setLoading(false);
       }
@@ -27,16 +46,26 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return <div className="text-center py-10 text-gray-500">Loading dashboard...</div>;
+    return (
+      <div className="text-center py-10 text-gray-500">
+        Loading dashboard...
+      </div>
+    );
   }
 
   if (!stats) {
-    return <div className="text-center py-10 text-red-500">Failed to load dashboard.</div>;
+    return (
+      <div className="text-center py-10 text-red-500">
+        Failed to load dashboard.
+      </div>
+    );
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6 text-[var(--primary-orange)]">Dashboard Overview</h1>
+      <h1 className="text-2xl font-bold mb-6 text-[var(--primary-orange)]">
+        Dashboard Overview
+      </h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded shadow text-center">
           <h2 className="text-lg font-semibold">Total Orders</h2>
@@ -44,7 +73,9 @@ const Dashboard = () => {
         </div>
         <div className="bg-white p-6 rounded shadow text-center">
           <h2 className="text-lg font-semibold">Total Revenue</h2>
-          <p className="text-2xl mt-2 text-gray-700">EGP {stats.totalRevenue.toFixed(2)}</p>
+          <p className="text-2xl mt-2 text-gray-700">
+            EGP {stats.totalRevenue?.toFixed(2) ?? "0.00"}
+          </p>
         </div>
         <div className="bg-white p-6 rounded shadow text-center">
           <h2 className="text-lg font-semibold">Total Products</h2>
