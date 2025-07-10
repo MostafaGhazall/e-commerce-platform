@@ -15,9 +15,8 @@ const AdminLogin = () => {
 
     try {
       await adminApi.post("/api/admin/auth/login", { email, password });
-
       toast.success("Logged in successfully!");
-      navigate("/", { replace: true }); // redirect after login
+      navigate("/", { replace: true });
     } catch (err: any) {
       console.error("Login failed:", err);
       toast.error("Invalid email or password");
@@ -27,32 +26,37 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--primary-sun)] px-4">
       <form
         onSubmit={handleLogin}
-        className="bg-white shadow-md rounded p-6 w-full max-w-sm space-y-4"
+        className="bg-white shadow-lg rounded-2xl p-8 w-full max-w-sm space-y-5 animate-slide-up"
       >
-        <h1 className="text-2xl font-bold text-center text-[var(--primary-orange)]">Admin Login</h1>
+        <h1 className="text-3xl font-bold text-center text-[var(--primary-orange)]">
+          Admin Login
+        </h1>
+
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-orange)]"
           required
         />
+
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary-orange)]"
           required
         />
+
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 disabled:opacity-50"
+          className="w-full py-3 text-white bg-[var(--primary-orange)] hover:bg-[var(--primary-redish)] rounded-lg font-semibold transition-all disabled:opacity-60"
         >
           {loading ? "Logging in..." : "Login"}
         </button>

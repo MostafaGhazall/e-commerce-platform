@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCartStore } from "../contexts/useCartStore";
 import { useProductStore } from "../contexts/useStore";
 import { useUserStore } from "../contexts/useUserStore";
-import { checkoutSchema, CheckoutInput } from "../../../shared/userValidators";
+import { checkoutSchema, type CheckoutInput } from "@shared/userValidators";
 import axios from "../api/axios";
 
 export default function Checkout() {

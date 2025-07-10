@@ -1,72 +1,114 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-import express from "express";
+import "dotenv/config";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-
-import authRoutes from "./routes/auth";
-import productRoutes from "./routes/products";
-import cartRoutes from "./routes/cart";
-import wishlistRoutes from "./routes/wishlist";
-import orderRoutes from "./routes/orders";
-import userRoutes from "./routes/user";
-
-import adminAuthRoutes from "./routes/adminAuthRoutes";
-import adminProductRoutes from "./routes/adminProductRoutes";
-import adminOrderRoutes from "./routes/adminOrderRoutes";
-import adminDashboardRoutes from "./routes/adminDashboardRoutes";
-
-import cookieParser from "cookie-parser";
 import helmet from "helmet";
+import compression from "compression";
+import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
+import pino from "pino-http";
 
+import authRoutes           from "./routes/auth";
+import productRoutes        from "./routes/products";
+import cartRoutes           from "./routes/cart";
+import wishlistRoutes       from "./routes/wishlist";
+import orderRoutes          from "./routes/orders";
+import userRoutes           from "./routes/user";
+import adminAuthRoutes      from "./routes/adminAuthRoutes";
+import adminProductRoutes   from "./routes/adminProductRoutes";
+import adminOrderRoutes     from "./routes/adminOrderRoutes";
+import adminDashboardRoutes from "./routes/adminDashboardRoutes";
+import adminCategoryRoutes from "./routes/adminCategoryRoutes";
+
+/* -------------------------------------------------------------------------- */
+/* Config                                                                     */
+/* -------------------------------------------------------------------------- */
+const PORT   = process.env.PORT        || 5000;
+const ORIGIN = process.env.CLIENT_URL  || "http://localhost:5173";
+
+/* -------------------------------------------------------------------------- */
+/* App init                                                                   */
+/* -------------------------------------------------------------------------- */
 const app = express();
-const PORT = process.env.PORT || 5000;
-app.set("trust proxy", 1);
+app.set("trust proxy", 1);          // correct client IPs behind nginx/ELB
+app.disable("x-powered-by");
+app.disable("etag");                // we’ll handle caching manually for JSON
 
-// Middleware
+/* -------------------------------------------------------------------------- */
+/* Global middleware                                                          */
+/* -------------------------------------------------------------------------- */
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    credentials: true, // if you're using cookies or auth headers
+    origin: ORIGIN,
+    credentials: true,
   })
 );
 
-app.use(express.json());
-app.use(cookieParser());
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
+}));
 
-// Root route
-app.get("/", (_req, res) => {
-  res.send("API is running...");
+app.use(compression());              // gzip/deflate
+app.use(express.json({ limit: "1mb" }));
+app.use(cookieParser());
+
+app.use(pino());                     // structured request logs
+
+// Tiny rate-limit: 100 req / 15 min per IP for auth & search
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+app.use("/api/auth",    authLimiter);
+app.use("/api/admin/auth", authLimiter);
+
+/* Prevent browsers caching any JSON */
+app.use((_, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
 });
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/user", userRoutes);
+/* ------------------------------------------------------------------ */
+/* Health-check                                                       */
+/* ------------------------------------------------------------------ */
+app.get("/health", (_req, res): void => {
+  res.json({ ok: true, uptime: process.uptime() });
+});
 
-app.use("/api/admin/auth", adminAuthRoutes);
+/* ------------------------------------------------------------------ */
+/* Root                                                               */
+/* ------------------------------------------------------------------ */
+app.get("/", (_req, res): void => {
+  res.send("API is running…");
+});
+
+app.use("/api/auth",          authRoutes);
+app.use("/api/products",      productRoutes);
+app.use("/api/cart",          cartRoutes);
+app.use("/api/wishlist",      wishlistRoutes);
+app.use("/api/orders",        orderRoutes);
+app.use("/api/user",          userRoutes);
+
+app.use("/api/categories",     adminCategoryRoutes);
+app.use("/api/admin/auth",     adminAuthRoutes);
 app.use("/api/admin/products", adminProductRoutes);
-app.use("/api/admin/orders", adminOrderRoutes);
-app.use("/api/admin", adminDashboardRoutes);
+app.use("/api/admin/orders",   adminOrderRoutes);
+app.use("/api/admin",          adminDashboardRoutes);
 
-// Global error handler
+/* -------------------------------------------------------------------------- */
+/* Unified async error handler                                                */
+/* -------------------------------------------------------------------------- */
 app.use(
-  (
-    err: any,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction
-  ) => {
-    console.error("Unhandled error:", err);
-    res.status(500).json({ message: "Internal Server Error" });
+  (err: any, _req: Request, res: Response, _next: NextFunction) => {
+    _req.log.error({ err }, "Unhandled error");
+    res.status(500).json({ ok: false, error: "Internal Server Error" });
   }
 );
 
-// Start server
+/* -------------------------------------------------------------------------- */
+/* Start                                                                      */
+/* -------------------------------------------------------------------------- */
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(`✅  Server running on http://localhost:${PORT}`);
 });

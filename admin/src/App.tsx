@@ -6,6 +6,8 @@ import Products from "./pages/Products";
 import AddProduct from "./pages/AddProduct";
 import EditProduct from "./pages/EditProduct";
 import AdminLogin from "./pages/AdminLogin";
+import Orders from "./pages/Orders";
+import OrderDetail from "./pages/OrderDetail";
 import RequireAdminAuth from "./components/RequireAdminAuth";
 
 const App = () => {
@@ -20,6 +22,8 @@ const App = () => {
             <Route path="/products" element={<Products />} />
             <Route path="/products/add" element={<AddProduct />} />
             <Route path="/products/edit/:id" element={<EditProduct />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/orders/:id" element={<OrderDetail />}/>
           </Route>
         </Route>
       </Routes>

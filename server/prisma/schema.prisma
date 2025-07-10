@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/client"
 }
 
 datasource db {
@@ -45,11 +44,13 @@ model Product {
   name          String
   description   String
   price         Float
-  category      String
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
   rating        Float          @default(0)
   sizes         String[]
   stock         Int
   slug          String         @unique
+  version       Int            @default(0)
   createdAt     DateTime       @default(now())       
   updatedAt     DateTime       @updatedAt @default(now())           
   cartItems     CartItem[]
@@ -60,18 +61,28 @@ model Product {
   wishlistItems WishlistItem[]
 }
 
+model Category {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  names     Json      @default("{}") 
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+
 model Image {
   id        String  @id @default(cuid())
   url       String
   productId String
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model ColorImage {
   id        String   @id @default(cuid())
   url       String
   colorId   String
-  color     Color    @relation(fields: [colorId], references: [id])
+  color     Color    @relation(fields: [colorId], references: [id], onDelete: Cascade)
 }
 
 model Color {
@@ -80,7 +91,9 @@ model Color {
   value     String
   images    ColorImage[]
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([productId, value])
 }
 
 model Review {
@@ -90,7 +103,7 @@ model Review {
   rating    Int
   date      DateTime @default(now())
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model Cart {
@@ -111,7 +124,7 @@ model CartItem {
   color     String?
   colorName String?
   cart      Cart    @relation(fields: [cartId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([cartId, productId, size, color])
 }
@@ -129,7 +142,7 @@ model WishlistItem {
   id         String   @id @default(cuid())
   wishlistId String
   productId  String
-  product    Product  @relation(fields: [productId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   wishlist   Wishlist @relation(fields: [wishlistId], references: [id])
 
   @@unique([wishlistId, productId])
@@ -165,5 +178,5 @@ model OrderItem {
   colorName String?
   imageUrl  String?
   order     Order   @relation(fields: [orderId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

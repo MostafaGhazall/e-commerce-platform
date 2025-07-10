@@ -1,87 +1,201 @@
-import { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import prisma from "../prisma";
+import {
+  ACTIVE_ORDER_STATES,
+  RESTOCK_ORDER_STATES,
+} from "../utils/orderStatus";
+import { z } from "zod";
 
-// ✅ GET /api/admin/orders?status=shipped&email=user@example.com&paymentMethod=cash-on-delivery&from=2024-01-01&to=2024-12-31&page=1&pageSize=20
+/* -------------------------------------------------------------------------- */
+/* 🧩  Schemas                                                                */
+/* -------------------------------------------------------------------------- */
+
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  status: z.string().optional(),
+  email: z.string().email().optional(),
+  paymentMethod: z.string().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
+const updateStatusSchema = z.object({
+  status: z
+    .string()
+    .refine(
+      (s) =>
+        [...ACTIVE_ORDER_STATES, ...RESTOCK_ORDER_STATES, "delivered"].includes(
+          s as any
+        ),
+      "Invalid status"
+    ),
+});
+
+/* -------------------------------------------------------------------------- */
+/* ✅ GET  /api/admin/orders                                                  */
+/* -------------------------------------------------------------------------- */
 export const getAllOrders = async (req: Request, res: Response) => {
-  const page = Number(req.query.page ?? 1);
-  const pageSize = Number(req.query.pageSize ?? 20);
-  const status = req.query.status as string | undefined;
-  const email = req.query.email as string | undefined;
-  const paymentMethod = req.query.paymentMethod as string | undefined;
-  const from = req.query.from as string | undefined;
-  const to = req.query.to as string | undefined;
-
-  const where: any = {};
-
-  if (status) where.status = status;
-  if (email) where.email = email;
-  if (paymentMethod) where.paymentMethod = paymentMethod;
-  if (from || to) {
-    where.createdAt = {};
-    if (from) where.createdAt.gte = new Date(from);
-    if (to) where.createdAt.lte = new Date(to);
+  /* 1️⃣ validate & coerce query params */
+  const parse = listQuerySchema.safeParse(req.query);
+  if (!parse.success) {
+    res.status(400).json({ ok: false, error: parse.error.flatten() });
+    return;
   }
+  const { page, pageSize, status, email, paymentMethod, from, to } = parse.data;
 
-  const [total, orders] = await Promise.all([
-    prisma.order.count({ where }),
-    prisma.order.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
+  /* 2️⃣ build “where” */
+  const where: Prisma.OrderWhereInput = {
+    ...(status && { status }),
+    ...(email && { email }),
+    ...(paymentMethod && { paymentMethod }),
+    ...(from || to
+      ? {
+          createdAt: {
+            ...(from && { gte: from }),
+            ...(to && { lte: to }),
+          },
+        }
+      : {}),
+  };
+
+  try {
+    /* 3️⃣ run count + page query together */
+    const [total, orders] = await prisma.$transaction([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          items: {
+            select: {
+              id: true,
+              quantity: true,
+              price: true,
+              size: true,
+              color: true,
+              colorName: true,
+              imageUrl: true,
+              product: { select: { id: true, name: true, slug: true } },
+            },
+          },
+        },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    res.json({
+      ok: true,
+      meta: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+      data: Array.isArray(orders) ? orders : [],
+    });
+  } catch (err) {
+    console.error("List orders failed:", err);
+    res.status(500).json({ ok: false, error: "Server error" });
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* ✅ GET  /api/admin/orders/:id                                              */
+/* -------------------------------------------------------------------------- */
+export const getOrderById = async (req: Request, res: Response) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
       include: {
         items: {
-          include: {
+          select: {
+            id: true,
+            quantity: true,
+            price: true,
+            size: true,
+            color: true,
+            colorName: true,
+            imageUrl: true,
             product: { select: { id: true, name: true, slug: true } },
           },
         },
       },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-  ]);
+    });
 
-  res.json({ total, page, pageSize, orders });
+    if (!order) {
+      res.status(404).json({ ok: false, error: "Order not found" });
+      return;
+    }
+
+    res.json({ ok: true, data: order });
+  } catch (err) {
+    console.error("Fetch order failed:", err);
+    res.status(500).json({ ok: false, error: "Server error" });
+  }
 };
 
-// ✅ Get one order by ID
-export const getOrderById = async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: {
-      items: {
-        include: {
-          product: {
-            select: { id: true, name: true, slug: true },
-          },
-        },
-      },
-    },
-  });
-
-  if (!order) {
-    res.status(404).json({ message: "Order not found" });
+/* -------------------------------------------------------------------------- */
+/* ✅ PATCH /api/admin/orders/:id/status                                      */
+/* -------------------------------------------------------------------------- */
+export const updateOrderStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  /* 1️⃣ validate body */
+  const parse = updateStatusSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ ok: false, error: parse.error.flatten() });
     return;
   }
+  const { status } = parse.data;
 
-  res.json(order);
-};
+  try {
+    await prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id: req.params.id },
+        include: { items: true },
+      });
+      if (!current) {
+        throw new PrismaClientKnownRequestError("Order not found", {
+          code: "P2025",
+          clientVersion: "n/a",
+        });
+      }
 
-// ✅ PATCH /api/admin/orders/:id/status  { status: "shipped" }
-export const updateOrderStatus = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { status } = req.body;
+      /* restock logic */
+      const wasActive = ACTIVE_ORDER_STATES.includes(current.status as any);
+      const willRestock = RESTOCK_ORDER_STATES.includes(status as any);
 
-  const allowed = ["pending", "shipped", "delivered", "cancelled"];
-  if (!allowed.includes(status)) {
-    res.status(400).json({ message: "Invalid status" });
-    return;
+      if (wasActive && willRestock) {
+        await Promise.all(
+          current.items.map((item) =>
+            tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: item.quantity } },
+            })
+          )
+        );
+      }
+
+      await tx.order.update({
+        where: { id: req.params.id },
+        data: { status },
+      });
+    });
+
+    /* 204 No Content */
+    res.status(204).end();
+  } catch (err) {
+    if (err instanceof PrismaClientKnownRequestError && err.code === "P2025") {
+      res.status(404).json({ ok: false, error: "Order not found" });
+      return;
+    }
+    console.error("Update order status failed:", err);
+    next(err); // let the global handler format the 500
   }
-
-  const order = await prisma.order.update({
-    where: { id },
-    data: { status },
-  });
-
-  res.json({ message: "Status updated", order });
 };

@@ -1,0 +1,2 @@
+ALTER TABLE "Category"
+  ADD COLUMN "names" JSONB NOT NULL DEFAULT '{}';

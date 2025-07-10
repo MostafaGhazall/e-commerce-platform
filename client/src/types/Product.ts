@@ -4,19 +4,24 @@ export interface Product {
   slug: string;
   description: string;
   price: number;
-  category: string;
   rating: number;
   stock: number;
   sizes: string[];
 
+  // flattened, localized category object no longer includes id
+  category: {
+    slug: string;
+    name: string;
+  };
+  
   colors: {
     id: string;
     name: string;
-    value: string;              // Hex value like "#006400"
-    images: Image[];            // Images for this color variant
+    value: string; // Hex value like "#006400"
+    images: Image[]; // Images for this color variant
   }[];
 
-  images: Image[];              // Main product images (outside color variations)
+  images: Image[]; // Main product images (outside color variations)
 
   reviews: ProductReview[];
 
@@ -36,4 +41,3 @@ export interface ProductReview {
   rating: number;
   date: string;
 }
-

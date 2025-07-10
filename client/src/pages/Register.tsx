@@ -58,7 +58,7 @@ export default function Register() {
         lastName: data.lastName,
         email: data.email,
       });
-      toast.success(t("register.success"));
+      toast.success(t("register.errors.success"));
       navigate("/profile");
     } catch (err) {
       toast.error(t("register.errors.serverError") || "Something went wrong");

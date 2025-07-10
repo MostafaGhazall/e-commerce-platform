@@ -1,6 +1,7 @@
 import { Router } from "express";
 import prisma from "../prisma";
 import { authenticate, AuthRequest } from "../middleware/auth";
+import { pickVariantImage } from "../utils/pickVariantImage";
 
 const router = Router();
 
@@ -10,7 +11,7 @@ router.post(
   authenticate,
   async (req: AuthRequest, res, next): Promise<void> => {
     try {
-      const userId = req.userId!;
+      const userId          = req.userId!;
       const { shipping, total } = req.body;
 
       if (!shipping || typeof total !== "number") {
@@ -18,7 +19,7 @@ router.post(
         return;
       }
 
-      // 1️⃣ Load cart with product images + colors
+      /* 1️⃣  Load cart with product images + colours ---------------------- */
       const cart = await prisma.cart.findFirst({
         where: { userId },
         include: {
@@ -26,17 +27,13 @@ router.post(
             include: {
               product: {
                 include: {
-                  images: true, // fallback product-level images
-                  colors: {
-                    include: {
-                      images: true, // pull color-level images
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+                  images: true,                       // product-level imgs
+                  colors: { include: { images: true } } // colour-level imgs
+                }
+              }
+            }
+          }
+        }
       });
 
       if (!cart || cart.items.length === 0) {
@@ -46,54 +43,61 @@ router.post(
 
       // 2️⃣ Create order + snapshot variant data, all in one transaction
       const order = await prisma.$transaction(async (tx) => {
+
+        // 2-A: reserve each line-item
+        for (const item of cart.items) {
+          const { count } = await tx.product.updateMany({
+            where: { id: item.productId, stock: { gte: item.quantity } },
+            data : { stock: { decrement: item.quantity } }
+          });
+          if (count !== 1) {
+            throw new Error(`Not enough stock for product ${item.productId}`);
+          }
+        }
+
+        // 2-B: create the order with snapshot fields
         const created = await tx.order.create({
           data: {
             userId,
             total,
             status: "pending",
-            paymentMethod: shipping.paymentMethod || "cash-on-delivery",
-            name: shipping.name,
-            email: shipping.email,
-            address: shipping.address,
-            city: shipping.city,
-            region: shipping.region,
+            paymentMethod: shipping.paymentMethod ?? "cash-on-delivery",
+            name      : shipping.name,
+            email     : shipping.email,
+            address   : shipping.address,
+            city      : shipping.city,
+            region    : shipping.region,
             postalcode: shipping.postalcode,
-            country: shipping.country,
-            phone: shipping.phone,
-            items: {
-              create: cart.items.map((item) => {
-                // pick color-specific image or fallback
-                const variantImageUrl =
-                  item.product.colors.find(
-                    (c) =>
-                      c.name.toLowerCase() === item.colorName?.toLowerCase()
-                  )?.images[0]?.url ??
-                  item.product.images[0]?.url ??
-                  "/fallback.png";
+            country   : shipping.country,
+            phone     : shipping.phone,
 
-                return {
-                  productId: item.productId,
-                  quantity: item.quantity,
-                  price: item.product.price,
-                  size: item.size,
-                  color: item.color,
-                  colorName: item.colorName,
-                  imageUrl: variantImageUrl,
-                };
-              }),
-            },
+            items: {
+              create: cart.items.map((item) => ({
+                productId : item.productId,
+                quantity  : item.quantity,
+                price     : item.product.price,
+                size      : item.size,
+                color     : item.color,
+                colorName : item.colorName,
+                imageUrl  : pickVariantImage(item)   // ✅ single helper call
+              }))
+            }
           },
-          include: { items: true },
+          include: { items: true }
         });
 
-        // clear out the cart
+        // 2-C: empty the cart
         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
         return created;
       });
 
       res.status(201).json(order);
-    } catch (err) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith("Not enough stock")) {
+        res.status(409).json({ message: err.message });
+        return;
+      }
       next(err);
     }
   }

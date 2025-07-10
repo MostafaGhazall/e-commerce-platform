@@ -6,7 +6,7 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Optional:  automatically log the user out on 401
+// automatically log the user out on 401
 api.interceptors.response.use(
   res => res,
   err => {

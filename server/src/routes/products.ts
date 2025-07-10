@@ -3,22 +3,31 @@ import prisma from "../prisma";
 
 const router = Router();
 
-// ✅ GET all products
+// ✅ GET all (or filtered) products
 router.get(
   "/",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const { category } = req.query;          // ⬅️ read ?category=footwear
+
       const products = await prisma.product.findMany({
+        where: category
+          ? {
+              category: {
+                slug: String(category),        // ⬅️ relational filter
+              },
+            }
+          : undefined,                         // ⬅️ no filter → all products
         include: {
           images: true,
           reviews: true,
           colors: {
-            include: {
-              images: true
-            },
+            include: { images: true },
           },
+          category: true,                     // ⬅️ so the client sees the name/slug
         },
       });
+
       res.json(products);
     } catch (err) {
       next(err);

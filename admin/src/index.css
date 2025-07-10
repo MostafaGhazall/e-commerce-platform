@@ -1,13 +1,58 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@import "tailwindcss";
+
+/* Background */
+.bg-theme {
+  background-color: var(--primary-orange);
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* Text */
+.text-theme {
+  color: var(--primary-orange);
 }
+
+/* Border */
+.border-theme {
+  border-color: var(--primary-orange);
+}
+
+/* Hover Background */
+.hover\:bg-theme:hover {
+  background-color: var(--primary-orange);
+}
+
+/* Hover Text */
+.hover\:text-theme:hover {
+  color: var(--primary-orange);
+}
+
+/* ====== Color Palette Variables ====== */
+
+:root {
+  --primary-sun: #ffeb3b;
+  --primary-amber: #ff9800;
+  --primary-orange: #ff5722;
+  --primary-redish: #f44336;
+  --primary-pinky: #e91e63;
+}
+
+@layer utilities {
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 300ms ease-out forwards;
+  }
+
+  /* Flip for RTL icons */
+  [dir="rtl"] .rotate-y-180 {
+    transform: scaleX(-1);
+  }
+
+}
+

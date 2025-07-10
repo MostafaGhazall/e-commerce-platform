@@ -1,223 +1,244 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, ChangeEvent, FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
 import toast from "react-hot-toast";
+import adminApi from "../api/axios";
+import axios from "axios";
+import { shapeZodError } from "@/utils/shapeZodError";
+import { isAllowedImageUrl } from "@/utils/isAllowedImage";
 
+/* ------------------------------------------------------------------ */
+/* Types                                                              */
+/* ------------------------------------------------------------------ */
 interface ImageObj {
   id?: string;
   url: string;
 }
-
 interface ColorObj {
   id?: string;
   name: string;
   value: string;
   images: ImageObj[];
 }
+interface ProductDto {
+  id: string;
+  version: number;
+  name: string;
+  slug: string;
+  description: string;
+  price: number;
+  stock: number;
 
-const EditProduct = () => {
-  const { id } = useParams();
+  category?: { name: string; slug: string };
+
+  categoryName: string;
+  sizes: string | string[];
+  images: ImageObj[];
+  colors: ColorObj[];
+}
+/* ------------------------------------------------------------------ */
+/* Helpers                                                            */
+/* ------------------------------------------------------------------ */
+// immutable update helpers
+const updateList = <T,>(list: T[], idx: number, val: Partial<T>) =>
+  list.map((el, i) => (i === idx ? { ...el, ...val } : el));
+const removeAt = <T,>(list: T[], idx: number) =>
+  list.filter((_, i) => i !== idx);
+
+const isHex = (hex: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
+
+/* ------------------------------------------------------------------ */
+/* Component                                                          */
+/* ------------------------------------------------------------------ */
+export default function EditProduct() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<{
-    name: string;
-    slug: string;
-    description: string;
-    price: string;   // string for easy binding, convert on submit
-    stock: string;
-    category: string;
-    sizes: string;   // comma-separated string “6, 7, 8”
-    images: ImageObj[];
-    colors: ColorObj[];
-  }>({
+  const EMPTY: ProductDto = {
+    id: "",
+    version: 0,
     name: "",
     slug: "",
     description: "",
-    price: "",
-    stock: "",
-    category: "",
+    price: 0,
+    stock: 0,
+    categoryName: "",
     sizes: "",
-    images: [{ id: "", url: "" }],
-    colors: [
-      {
-        id: "",
-        name: "",
-        value: "",
-        images: [{ id: "", url: "" }],
-      },
-    ],
-  });
+    images: [{ url: "" }],
+    colors: [{ name: "", value: "", images: [{ url: "" }] }],
+  };
 
-  /* ─────────────────────────────────────────────────────────── */
-  /* Load product on mount                                       */
-  /* ─────────────────────────────────────────────────────────── */
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<ProductDto>(EMPTY);
+
+  /* ----------------------------- Fetch product once ----------------------------- */
   useEffect(() => {
-    const fetchProduct = async () => {
+    (async () => {
       try {
-        const { data } = await axios.get(`/api/admin/products/${id}`, {
-          withCredentials: true,
-        });
+        /* 🔹 second generic → resolved value IS ProductDto */
+        const p = await adminApi.get<ProductDto, ProductDto>(
+          `/api/admin/products/${id}`
+        );
 
         setForm({
-          name: data.name,
-          slug: data.slug,
-          description: data.description,
-          price: data.price.toString(),
-          stock: data.stock.toString(),
-          category: data.category,
-          sizes: data.sizes.join(", "),
-          images: data.images, // [{ id, url }]
-          colors: data.colors.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            value: c.value,
-            images: c.images, // [{ id, url }]
-          })),
+          ...p,
+          categoryName: p.categoryName ?? p.category?.name ?? "",
+          sizes: Array.isArray(p.sizes) ? p.sizes : p.sizes ?? [],
         });
-      } catch {
-        toast.error("Failed to load product");
+      } catch (err: any) {
+        toast.error(err?.response?.data?.error ?? "Failed to load product");
+        navigate("/products");
       } finally {
         setLoading(false);
       }
-    };
+    })();
+  }, [id, navigate]);
 
-    fetchProduct();
-  }, [id]);
+  /* ----------------------------- Helpers ----------------------------- */
+  const onField =
+    <K extends keyof ProductDto>(key: K) =>
+    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((p) => ({ ...p, [key]: e.target.value }));
 
-  /* ─────────────────────────────────────────────────────────── */
-  /* Simple text/textarea change handler                         */
-  /* ─────────────────────────────────────────────────────────── */
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  /* ─────────────────────────────────────────────────────────── */
-  /* Submit                                                      */
-  /* ─────────────────────────────────────────────────────────── */
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* ----------------------------- Submit ----------------------------- */
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    try {
-      await axios.put(
-        `/api/admin/products/${id}`,
-        {
-          ...form,
-          price: parseFloat(form.price),
-          stock: parseInt(form.stock, 10),
-          sizes: form.sizes.split(",").map((s) => s.trim()),
-          images: form.images.map(({ id, url }) => ({ id, url })),
-          colors: form.colors.map((c) => ({
-            id: c.id,
-            name: c.name,
-            value: c.value,
-            images: c.images.map(({ id, url }) => ({ id, url })),
-          })),
-        },
-        { withCredentials: true }
+
+    const price = Number(form.price);
+    const stock = Number(form.stock);
+    const raw = form.sizes;
+    const sizes = Array.isArray(raw)
+      ? raw
+      : raw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+    /* client-side sanity checks ------------------------------------- */
+    if (Number.isNaN(price) || Number.isNaN(stock))
+      return toast.error("Price / Stock must be valid numbers");
+
+    if (!form.images.every((i) => isAllowedImageUrl(i.url)))
+      return toast.error(
+        "Image URL must start with http / https / data / ipfs / ar / ftp"
       );
 
+    if (!form.colors.every((c) => isHex(c.value)))
+      return toast.error("Color codes must be valid hex (#RRGGBB)");
+
+    setSaving(true);
+    try {
+      await adminApi.put(`/api/admin/products/${form.id}`, {
+        ...form,
+        price,
+        stock,
+        sizes,
+        images: form.images.filter((i) => i.url.trim()),
+        colors: form.colors
+          .filter((c) => c.name.trim() && c.value.trim())
+          .map((c) => ({ ...c, images: c.images.filter((i) => i.url.trim()) })),
+      });
+
       toast.success("Product updated");
-      navigate("/products");
-    } catch {
-      toast.error("Failed to update product");
+      navigate(-1); // optimistic back
+    } catch (err: any) {
+      const msg =
+        axios.isAxiosError(err) && err.response?.data?.error
+          ? shapeZodError(err.response.data.error)
+          : "Update failed";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loading) return <p className="p-6">Loading...</p>;
+  /* ----------------------------- Render ----------------------------- */
+  if (loading) return <p className="p-6">Loading…</p>;
 
-  /* ─────────────────────────────────────────────────────────── */
-  /* UI                                                          */
-  /* ─────────────────────────────────────────────────────────── */
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Edit Product</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-xl">
-        <fieldset disabled={loading} className="space-y-4">
-          {/* Basic fields */}
-          <input
-            type="text"
-            name="name"
-            placeholder="Name"
-            value={form.name}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="text"
-            name="slug"
-            placeholder="Slug"
-            value={form.slug}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-          />
-          <textarea
-            name="description"
-            placeholder="Description"
-            value={form.description}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="number"
-            name="price"
-            placeholder="Price"
-            value={form.price}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="number"
-            name="stock"
-            placeholder="Stock"
-            value={form.stock}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="text"
-            name="category"
-            placeholder="Category"
-            value={form.category}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-          />
-          <input
-            type="text"
-            name="sizes"
-            placeholder="Sizes (comma-separated)"
-            value={form.sizes}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-          />
+        <fieldset disabled={saving} className="space-y-4">
+          {/* BASIC FIELDS ------------------------------------------------------- */}
+          {[
+            { id: "name", label: "Name", type: "text" },
+            { id: "slug", label: "Slug", type: "text" },
+            { id: "categoryName", label: "Category", type: "text" },
+            {
+              id: "price",
+              label: "Price",
+              type: "number",
+              min: 0,
+              step: "0.01",
+            },
+            { id: "stock", label: "Stock", type: "number", min: 0 },
+          ].map((f) => (
+            <div key={f.id}>
+              <label htmlFor={f.id} className="block text-sm font-medium mb-1">
+                {f.label}
+              </label>
+              <input
+                {...f}
+                id={f.id}
+                value={(form as any)[f.id]}
+                onChange={onField(f.id as any)}
+                className="w-full border p-2 rounded"
+              />
+            </div>
+          ))}
 
-          {/* Product-level images */}
+          <div>
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium mb-1"
+            >
+              Description
+            </label>
+            <textarea
+              id="description"
+              value={form.description}
+              onChange={onField("description")}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="sizes" className="block text-sm font-medium mb-1">
+              Sizes (comma-separated)
+            </label>
+            <input
+              id="sizes"
+              value={
+                Array.isArray(form.sizes) ? form.sizes.join(", ") : form.sizes
+              }
+              onChange={onField("sizes")}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          {/* IMAGES ------------------------------------------------------------- */}
           <div className="space-y-2">
-            <label className="block font-semibold">Images</label>
+            <span className="font-semibold">Images</span>
             {form.images.map((img, i) => (
-              <div key={i} className="flex gap-2">
+              <div key={i} className="flex gap-2 items-center">
                 <input
-                  type="text"
+                  aria-label={`Image ${i + 1}`}
                   value={img.url}
-                  onChange={(e) => {
-                    const updated = [...form.images];
-                    updated[i].url = e.target.value;
-                    setForm((prev) => ({ ...prev, images: updated }));
-                  }}
-                  placeholder={`Image URL ${i + 1}`}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      images: updateList(p.images, i, { url: e.target.value }),
+                    }))
+                  }
                   className="flex-1 border p-2 rounded"
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    setForm((prev) => ({
-                      ...prev,
-                      images: prev.images.filter((_, idx) => idx !== i),
-                    }));
-                  }}
+                  aria-label="Remove image"
+                  onClick={() =>
+                    setForm((p) => ({ ...p, images: removeAt(p.images, i) }))
+                  }
                   className="text-red-500"
                 >
                   ✕
@@ -227,67 +248,81 @@ const EditProduct = () => {
             <button
               type="button"
               onClick={() =>
-                setForm((prev) => ({
-                  ...prev,
-                  images: [...prev.images, { id: "", url: "" }],
-                }))
+                setForm((p) => ({ ...p, images: [...p.images, { url: "" }] }))
               }
               className="text-sm text-blue-600"
             >
-              + Add Image
+              + Add image
             </button>
           </div>
 
-          {/* Colors + nested images */}
-          <div className="space-y-2 mt-6">
-            <label className="block font-semibold">Colors</label>
-            {form.colors.map((color, i) => (
+          {/* COLORS ------------------------------------------------------------- */}
+          <div className="space-y-4">
+            <span className="font-semibold">Colors</span>
+
+            {form.colors.map((c, i) => (
               <div key={i} className="border p-4 rounded space-y-2 bg-gray-50">
                 <input
-                  type="text"
+                  aria-label="Color name"
+                  value={c.name}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      colors: updateList(p.colors, i, { name: e.target.value }),
+                    }))
+                  }
                   placeholder="Color name"
-                  value={color.name}
-                  onChange={(e) => {
-                    const updated = [...form.colors];
-                    updated[i].name = e.target.value;
-                    setForm((prev) => ({ ...prev, colors: updated }));
-                  }}
                   className="w-full border p-2 rounded"
                 />
                 <input
-                  type="text"
-                  placeholder="Color value (#FF0000)"
-                  value={color.value}
-                  onChange={(e) => {
-                    const updated = [...form.colors];
-                    updated[i].value = e.target.value;
-                    setForm((prev) => ({ ...prev, colors: updated }));
-                  }}
+                  aria-label="Color hex"
+                  value={c.value}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      colors: updateList(p.colors, i, {
+                        value: e.target.value,
+                      }),
+                    }))
+                  }
+                  placeholder="#hex"
                   className="w-full border p-2 rounded"
                 />
 
-                {color.images.map((img, j) => (
-                  <div key={j} className="flex gap-2">
+                {/* Color images */}
+                {c.images.map((img, j) => (
+                  <div key={j} className="flex gap-2 items-center">
                     <input
-                      type="text"
-                      placeholder={`Color Image ${j + 1}`}
+                      aria-label={`Color image ${j + 1}`}
                       value={img.url}
-                      onChange={(e) => {
-                        const updated = [...form.colors];
-                        updated[i].images[j].url = e.target.value;
-                        setForm((prev) => ({ ...prev, colors: updated }));
-                      }}
+                      onChange={(e) =>
+                        setForm((p) => {
+                          const newColors = [...p.colors];
+                          newColors[i].images = updateList(
+                            newColors[i].images,
+                            j,
+                            {
+                              url: e.target.value,
+                            }
+                          );
+                          return { ...p, colors: newColors };
+                        })
+                      }
                       className="flex-1 border p-2 rounded"
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        const updated = [...form.colors];
-                        updated[i].images = updated[i].images.filter(
-                          (_, idx) => idx !== j
-                        );
-                        setForm((prev) => ({ ...prev, colors: updated }));
-                      }}
+                      aria-label="Remove color image"
+                      onClick={() =>
+                        setForm((p) => {
+                          const newColors = [...p.colors];
+                          newColors[i].images = removeAt(
+                            newColors[i].images,
+                            j
+                          );
+                          return { ...p, colors: newColors };
+                        })
+                      }
                       className="text-red-500"
                     >
                       ✕
@@ -297,58 +332,56 @@ const EditProduct = () => {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    const updated = [...form.colors];
-                    updated[i].images.push({ id: "", url: "" });
-                    setForm((prev) => ({ ...prev, colors: updated }));
-                  }}
-                  className="text-sm text-blue-600"
+                  className="text-sm text-blue-600 pr-3"
+                  onClick={() =>
+                    setForm((p) => {
+                      const newColors = [...p.colors];
+                      newColors[i].images.push({ url: "" });
+                      return { ...p, colors: newColors };
+                    })
+                  }
                 >
-                  + Add Color Image
+                  + Add color image
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setForm((prev) => ({
-                      ...prev,
-                      colors: prev.colors.filter((_, idx) => idx !== i),
-                    }));
-                  }}
-                  className="text-sm text-red-600 mt-2"
+                  className="text-sm text-red-600"
+                  onClick={() =>
+                    setForm((p) => ({ ...p, colors: removeAt(p.colors, i) }))
+                  }
                 >
-                  Remove Color
+                  Remove color
                 </button>
               </div>
             ))}
 
             <button
               type="button"
+              className="text-sm text-blue-600"
               onClick={() =>
-                setForm((prev) => ({
-                  ...prev,
+                setForm((p) => ({
+                  ...p,
                   colors: [
-                    ...prev.colors,
-                    { id: "", name: "", value: "", images: [{ id: "", url: "" }] },
+                    ...p.colors,
+                    { name: "", value: "", images: [{ url: "" }] },
                   ],
                 }))
               }
-              className="text-sm text-blue-600"
             >
-              + Add Color
+              + Add color
             </button>
           </div>
 
           <button
             type="submit"
-            className="bg-orange-500 text-white px-4 py-2 rounded"
+            disabled={saving}
+            className="bg-[var(--primary-orange)] text-white px-4 py-2 rounded"
           >
-            Update Product
+            {saving ? "Saving…" : "Update product"}
           </button>
         </fieldset>
       </form>
     </div>
   );
-};
-
-export default EditProduct;
+}

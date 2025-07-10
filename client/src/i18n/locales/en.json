@@ -19,10 +19,10 @@
     "wishlist": "Wishlist",
     "Cart": "Cart",
     "Home": "Home",
-    "Clothing": "Clothing",
-    "Accessories": "Accessories",
-    "Electronics": "Electronics",
-    "Furniture": "Furniture"
+    "clothing": "Clothing",
+    "accessories": "Accessories",
+    "electronics": "Electronics",
+    "furniture": "Furniture"
   },
 
   "homePage": {
@@ -139,6 +139,7 @@
     "strengthWeak": "Weak",
     "strengthMedium": "Medium",
     "strengthStrong": "Strong",
+    "registering": "Registering...",
     "errors": {
       "fillAll": "Please fill in all fields",
       "invalidEmail": "Please enter a valid email",
@@ -146,7 +147,8 @@
       "noMatch": "Passwords do not match",
       "terms": "You must agree to the terms and conditions",
       "exists": "Email already exists. Try logging in.",
-      "success": "Account created!"
+      "success": "Account created!",
+      "serverError": "Something went wrong. Please try again later"
     }
   },
 

@@ -1,19 +1,15 @@
 import { create } from "zustand";
 import api from "../api/axios";
 import { Product, ProductReview } from "../types/Product";
+import { fetchAllProducts } from "../services/productService";
 
-export const fetchAllProducts = async (): Promise<Product[]> => {
-  const { data } = await api.get<Product[]>("/products");
-  return data;
-};
+/* ─────────────────────────────────────────────── */
+/* Helper API calls                                */
+/* ─────────────────────────────────────────────── */
 
 export const addReviewToProduct = async (
   productId: string,
-  review: {
-    comment: string;
-    name: string;
-    rating: number;
-  }
+  review: { comment: string; name: string; rating: number }
 ): Promise<ProductReview> => {
   const { data } = await api.post<ProductReview>(
     `/products/${productId}/reviews`,
@@ -22,15 +18,18 @@ export const addReviewToProduct = async (
   return data;
 };
 
+/* ─────────────────────────────────────────────── */
+/* Zustand store                                   */
+/* ─────────────────────────────────────────────── */
 interface ProductState {
   products: Product[];
   filteredProducts: Product[];
   loading: boolean;
   searchQuery: string;
-  categoryFilter: string;
+  categoryFilter: string;  // holds category slug
   sortOption: string;
   setSearchQuery: (query: string) => void;
-  setCategoryFilter: (category: string) => void;
+  setCategoryFilter: (slug: string) => void;
   setSortOption: (option: string) => void;
   loadProducts: () => Promise<void>;
   filterProducts: () => void;
@@ -46,13 +45,14 @@ export const useProductStore = create<ProductState>((set, get) => ({
   categoryFilter: "",
   sortOption: "",
 
+  /* ---------- search / category / sort setters ---------- */
   setSearchQuery: (query) => {
     set({ searchQuery: query });
     get().filterProducts();
   },
 
-  setCategoryFilter: (category) => {
-    set({ categoryFilter: category });
+  setCategoryFilter: (slug) => {
+    set({ categoryFilter: slug });
     get().filterProducts();
   },
 
@@ -61,13 +61,14 @@ export const useProductStore = create<ProductState>((set, get) => ({
     get().sortProducts(option);
   },
 
+  /* ---------- load products ---------- */
   loadProducts: async () => {
     set({ loading: true });
     try {
       const products = await fetchAllProducts();
       set({ products });
     } catch (error) {
-      console.error("Failed to load products from API:", error);
+      console.error("Failed to load products:", error);
       set({ products: [] });
     } finally {
       get().filterProducts();
@@ -75,52 +76,36 @@ export const useProductStore = create<ProductState>((set, get) => ({
     }
   },
 
+  /* ---------- filter and sort ---------- */
   filterProducts: () => {
     const { products, searchQuery, categoryFilter, sortOption } = get();
-    const lowerQuery = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
 
-    let filtered = products.filter((product) => {
-      const matchName = product.name.toLowerCase().includes(lowerQuery);
-      const matchCategory = categoryFilter
-        ? product.category.toLowerCase() === categoryFilter.toLowerCase()
-        : true; // No category filter applied
-
-      // Both searchQuery AND categoryFilter must match
-      return matchName && matchCategory;
+    let filtered = products.filter((p) => {
+      const matchesName = p.name.toLowerCase().includes(q);
+      const matchesCat = categoryFilter
+        ? p.category?.slug === categoryFilter
+        : true;
+      return matchesName && matchesCat;
     });
 
-    // Sort
-    if (sortOption === "price-low") {
-      filtered.sort((a, b) => a.price - b.price);
-    } else if (sortOption === "price-high") {
-      filtered.sort((a, b) => b.price - a.price);
-    } else if (sortOption === "alpha") {
-      filtered.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    set({ filteredProducts: filtered });
+    get().sortProducts(sortOption, filtered);
   },
 
   sortProducts: (option, productsToSort = get().filteredProducts) => {
     let sorted = [...productsToSort];
 
-    if (option === "price-low") {
-      sorted.sort((a, b) => a.price - b.price);
-    } else if (option === "price-high") {
-      sorted.sort((a, b) => b.price - a.price);
-    } else if (option === "alpha") {
+    if (option === "price-low") sorted.sort((a, b) => a.price - b.price);
+    else if (option === "price-high") sorted.sort((a, b) => b.price - a.price);
+    else if (option === "alpha")
       sorted.sort((a, b) => a.name.localeCompare(b.name));
-    }
 
     set({ filteredProducts: sorted });
   },
 
+  /* ---------- reset ---------- */
   resetFilters: () => {
-    set({
-      searchQuery: "",
-      categoryFilter: "",
-      sortOption: "",
-    });
+    set({ searchQuery: "", categoryFilter: "", sortOption: "" });
     get().filterProducts();
   },
 }));

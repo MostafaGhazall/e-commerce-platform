@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Home, User, ShoppingCart, ChevronDown, ChevronUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
 import { useCartStore } from "../contexts/useCartStore";
 import { usePreferenceStore } from "../contexts/usePreferenceStore";
 import { useAuthStore } from "../contexts/useAuthStore";
-import { useTranslation } from "react-i18next";
-import { Home, User, ShoppingCart, ChevronDown, ChevronUp } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { useCategories } from "../contexts/useCategories";
 
 export default function Navbar() {
   const cart = useCartStore((state) => state.cart);
@@ -21,6 +22,7 @@ export default function Navbar() {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const { categories, loading: catLoading } = useCategories();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -241,30 +243,19 @@ export default function Navbar() {
       {location.pathname === "/" && (
         <div className="bg-white border-t border-gray-200 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 py-2 flex justify-center gap-6 flex-wrap">
-            <NavLink
-              to="/products?category=clothing"
-              className="text-sm text-gray-700 hover:text-theme font-medium"
-            >
-              {t("navbar.Clothing")}
-            </NavLink>
-            <NavLink
-              to="/products?category=accessories"
-              className="text-sm text-gray-700 hover:text-theme font-medium"
-            >
-              {t("navbar.Accessories")}
-            </NavLink>
-            <NavLink
-              to="/products?category=electronics"
-              className="text-sm text-gray-700 hover:text-theme font-medium"
-            >
-              {t("navbar.Electronics")}
-            </NavLink>
-            <NavLink
-              to="/products?category=furniture"
-              className="text-sm text-gray-700 hover:text-theme font-medium"
-            >
-              {t("navbar.Furniture")}
-            </NavLink>
+            {catLoading ? (
+              <span>Loading…</span>
+            ) : (
+              categories.map(({ slug, name }) => (
+                <NavLink
+                  key={slug}
+                  to={`/products?category=${encodeURIComponent(slug)}`}
+                  className="text-sm …"
+                >
+                  {name}
+                </NavLink>
+              ))
+            )}
           </div>
         </div>
       )}

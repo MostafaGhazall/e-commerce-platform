@@ -1,4 +1,5 @@
-import { PrismaClient } from "../src/generated/client";
+import { PrismaClient } from "@prisma/client";
+import slugify from "slugify";
 
 const prisma = new PrismaClient();
 
@@ -80,6 +81,24 @@ async function main() {
       continue;
     }
 
+    const categorySlug = slugify(product.category, { lower: true });
+
+    // 🔁 Find or create category
+    let category = await prisma.category.findUnique({
+      where: { slug: categorySlug },
+    });
+
+    if (!category) {
+      category = await prisma.category.create({
+        data: {
+          names: { en: product.category, ar: "" },
+          slug: categorySlug,
+        },
+      });
+      console.log(`🆕 Created category: ${product.category}`);
+    }
+
+    // ✅ Create product with category relation
     await prisma.product.create({
       data: {
         name: product.name,
@@ -87,8 +106,8 @@ async function main() {
         price: product.price,
         description: product.description,
         stock: product.stock,
-        category: product.category,
         sizes: product.sizes,
+        categoryId: category.id, // ✅ link via relation
         images: {
           create: product.images.map((url) => ({ url })),
         },

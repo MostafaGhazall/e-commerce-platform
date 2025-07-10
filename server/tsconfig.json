@@ -4,7 +4,7 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "outDir": "./dist",
-    "rootDir": "./src",                                // ✅ one level up to include shared/
+    "rootDir": "../",                            
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,6 +12,7 @@
   },
   "include": [
     "./src/**/*",
+    "scripts/**/*",
     "../shared/**/*"                                 // ✅ include shared files
   ]
 }
