@@ -21,11 +21,15 @@ const adminAuthRoutes_1 = __importDefault(require("./routes/adminAuthRoutes"));
 const adminProductRoutes_1 = __importDefault(require("./routes/adminProductRoutes"));
 const adminOrderRoutes_1 = __importDefault(require("./routes/adminOrderRoutes"));
 const adminDashboardRoutes_1 = __importDefault(require("./routes/adminDashboardRoutes"));
+const adminCategoryRoutes_1 = __importDefault(require("./routes/adminCategoryRoutes"));
 /* -------------------------------------------------------------------------- */
 /* Config                                                                     */
 /* -------------------------------------------------------------------------- */
 const PORT = process.env.PORT || 5000;
-const ORIGIN = process.env.CLIENT_URL || "http://localhost:5173";
+const ORIGINS = [
+    process.env.CLIENT_URL || "http://localhost:5173",
+    process.env.ADMIN_URL || "http://localhost:5174", // local fallback if needed
+];
 /* -------------------------------------------------------------------------- */
 /* App init                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -37,7 +41,7 @@ app.disable("etag"); // we’ll handle caching manually for JSON
 /* Global middleware                                                          */
 /* -------------------------------------------------------------------------- */
 app.use((0, cors_1.default)({
-    origin: ORIGIN,
+    origin: ORIGINS,
     credentials: true,
 }));
 app.use((0, helmet_1.default)({
@@ -78,6 +82,7 @@ app.use("/api/cart", cart_1.default);
 app.use("/api/wishlist", wishlist_1.default);
 app.use("/api/orders", orders_1.default);
 app.use("/api/user", user_1.default);
+app.use("/api/categories", adminCategoryRoutes_1.default);
 app.use("/api/admin/auth", adminAuthRoutes_1.default);
 app.use("/api/admin/products", adminProductRoutes_1.default);
 app.use("/api/admin/orders", adminOrderRoutes_1.default);

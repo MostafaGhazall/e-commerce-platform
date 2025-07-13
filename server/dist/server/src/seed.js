@@ -86,7 +86,7 @@ async function main() {
         if (!category) {
             category = await prisma.category.create({
                 data: {
-                    name: product.category,
+                    names: { en: product.category, ar: "" },
                     slug: categorySlug,
                 },
             });

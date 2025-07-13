@@ -250,7 +250,7 @@ export default function Navbar() {
                 <NavLink
                   key={slug}
                   to={`/products?category=${encodeURIComponent(slug)}`}
-                  className="text-sm …"
+                  className="text-sm text-gray-700 hover:text-theme font-semibold"
                 >
                   {name}
                 </NavLink>

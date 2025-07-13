@@ -23,7 +23,11 @@ import adminCategoryRoutes from "./routes/adminCategoryRoutes";
 /* Config                                                                     */
 /* -------------------------------------------------------------------------- */
 const PORT   = process.env.PORT        || 5000;
-const ORIGIN = process.env.CLIENT_URL  || "http://localhost:5173";
+const ORIGINS = [
+  process.env.CLIENT_URL || "http://localhost:5173",
+  process.env.ADMIN_URL  || "http://localhost:5174", // local fallback if needed
+];
+
 
 /* -------------------------------------------------------------------------- */
 /* App init                                                                   */
@@ -38,7 +42,7 @@ app.disable("etag");                // we’ll handle caching manually for JSON
 /* -------------------------------------------------------------------------- */
 app.use(
   cors({
-    origin: ORIGIN,
+    origin: ORIGINS,
     credentials: true,
   })
 );

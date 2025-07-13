@@ -6,21 +6,28 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProductById = exports.deleteProduct = exports.updateProduct = exports.getAllProducts = exports.createProduct = void 0;
 const prisma_1 = __importDefault(require("../prisma"));
 const library_1 = require("@prisma/client/runtime/library");
+const client_1 = require("@prisma/client");
 const parseIntSafe_1 = require("../utils/parseIntSafe");
+const clamp_1 = require("../utils/clamp");
 const userValidators_1 = require("../../../shared/userValidators");
 const slugify_1 = __importDefault(require("slugify"));
+/** Extract locale from ?lang=ar or default to "en" */
+function getLocale(req) {
+    return req.query.lang === "ar" ? "ar" : "en";
+}
 /* -------------------------------------------------------------------------- */
 /* ✅ CREATE PRODUCT                                                          */
 /* -------------------------------------------------------------------------- */
 const createProduct = async (req, res) => {
     const parsed = userValidators_1.createProductSchema.safeParse(req.body);
     if (!parsed.success) {
+        console.error("Create payload invalid:\n", parsed.error.format());
         res.status(400).json({ ok: false, error: parsed.error.flatten() });
         return;
     }
-    const { name, slug, price, description, stock, categoryName, sizes, images, colors, } = parsed.data;
+    const { name, slug, price, description, stock, categoryNames, sizes, images, colors, } = parsed.data;
     try {
-        /* 1️⃣ ensure slug uniqueness */
+        // 1️⃣ ensure product slug is unique
         const slugExists = await prisma_1.default.product.findUnique({ where: { slug } });
         if (slugExists) {
             res
@@ -28,14 +35,17 @@ const createProduct = async (req, res) => {
                 .json({ ok: false, error: "Slug already exists, choose another" });
             return;
         }
-        /* 2️⃣ upsert category */
-        const categorySlug = (0, slugify_1.default)(categoryName, { lower: true });
+        // 2️⃣ upsert category with names JSON
+        const categorySlug = (0, slugify_1.default)(categoryNames.en, {
+            lower: true,
+            strict: true,
+        });
         const category = await prisma_1.default.category.upsert({
             where: { slug: categorySlug },
-            create: { name: categoryName, slug: categorySlug },
-            update: {},
+            create: { slug: categorySlug, names: categoryNames },
+            update: { names: categoryNames },
         });
-        /* 3️⃣ create product + nested */
+        // 3️⃣ create product + nested relations
         const product = await prisma_1.default.product.create({
             data: {
                 name,
@@ -60,7 +70,20 @@ const createProduct = async (req, res) => {
                 category: true,
             },
         });
-        res.status(201).json({ ok: true, data: product });
+        // 4️⃣ respond with flattened category
+        const locale = getLocale(req);
+        const categoryNameLocalized = product.category.names[locale] ||
+            product.category.slug;
+        res.status(201).json({
+            ok: true,
+            data: {
+                ...product,
+                category: {
+                    slug: product.category.slug,
+                    name: categoryNameLocalized,
+                },
+            },
+        });
         return;
     }
     catch (err) {
@@ -73,53 +96,46 @@ const createProduct = async (req, res) => {
 };
 exports.createProduct = createProduct;
 /* -------------------------------------------------------------------------- */
-/* ✅ GET ALL PRODUCTS (pagination coming in Step 4)                          */
+/* ✅ GET ALL PRODUCTS (pagination)                                           */
 /* -------------------------------------------------------------------------- */
 const getAllProducts = async (req, res) => {
-    const num = (q) => {
-        if (typeof q !== "string")
-            return undefined;
-        const n = Number(q);
-        return Number.isFinite(n) ? n : undefined;
-    };
-    /* 1️⃣ pull & sanitise query params ------------------------------------- */
-    const page = Math.min(Math.max((0, parseIntSafe_1.i)(req.query.page, 1), 9999), 9999);
-    const limit = Math.min(Math.max((0, parseIntSafe_1.i)(req.query.limit, 20), 1), 100);
-    const search = String(req.query.search ?? "").trim();
-    const catSlug = String(req.query.category ?? "")
-        .trim()
-        .toLowerCase();
-    const priceMin = num(req.query.priceMin);
-    const priceMax = num(req.query.priceMax);
-    /* 2️⃣ craft Prisma "where" clause -------------------------------------- */
-    const where = {
-        AND: [
-            catSlug && { category: { slug: catSlug } },
-            search && {
-                OR: [
-                    { name: { contains: search, mode: "insensitive" } },
-                    { description: { contains: search, mode: "insensitive" } },
-                ],
-            },
-            priceMin !== undefined && { price: { gte: priceMin } },
-            priceMax !== undefined && { price: { lte: priceMax } },
-        ].filter(Boolean),
-    };
+    const page = (0, clamp_1.clamp)((0, parseIntSafe_1.i)(req.query.page, 1), 1, 9999);
+    const limit = (0, clamp_1.clamp)((0, parseIntSafe_1.i)(req.query.limit, 20), 1, 100);
     try {
-        /* 3️⃣ run count + paged query together (single round-trip) ----------- */
-        const [total, items] = await prisma_1.default.$transaction([
-            prisma_1.default.product.count({ where }),
+        const locale = getLocale(req);
+        // fetch total + paged results
+        const [total, rows] = await prisma_1.default.$transaction([
+            prisma_1.default.product.count(),
             prisma_1.default.product.findMany({
-                where,
-                include: { images: true, colors: true, category: true },
                 orderBy: { createdAt: "desc" },
                 skip: (page - 1) * limit,
                 take: limit,
+                select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    price: true,
+                    stock: true,
+                    createdAt: true,
+                    category: {
+                        select: { names: true, slug: true },
+                    },
+                },
             }),
         ]);
+        // flatten Decimal + category JSON → single `category.name`
+        const data = rows.map((r) => {
+            const catNames = r.category.names;
+            const catName = catNames[locale] || r.category.slug;
+            return {
+                ...r,
+                price: Number(r.price),
+                category: { slug: r.category.slug, name: catName },
+            };
+        });
         res.json({
             ok: true,
-            data: items,
+            data,
             meta: {
                 page,
                 limit,
@@ -131,26 +147,26 @@ const getAllProducts = async (req, res) => {
     }
     catch (err) {
         console.error("Fetch products failed:", err);
-        res.status(500).json({ ok: false, error: "Failed to fetch products" });
+        res.status(500).json({ ok: false, error: "Server error" });
         return;
     }
 };
 exports.getAllProducts = getAllProducts;
 /* -------------------------------------------------------------------------- */
-/* ✅ UPDATE PRODUCT  –  nested write + optimistic concurrency                */
+/* ✅ UPDATE PRODUCT  – nested write + optimistic concurrency                 */
 /* -------------------------------------------------------------------------- */
 const updateProduct = async (req, res) => {
     const { id } = req.params;
-    /* 0️⃣ validate body */
     const parsed = userValidators_1.updateProductSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({ ok: false, error: parsed.error.flatten() });
         return;
     }
+    const locale = getLocale(req);
     const clientVersion = parsed.data.version;
-    const { name, slug, price, description, stock, categoryName, sizes, images = [], colors = [], } = parsed.data;
+    const { name, slug, price, description, stock, categoryNames, sizes, images = [], colors = [], } = parsed.data;
     try {
-        /* 1️⃣ verify product still exists */
+        // 1️⃣ fetch current version
         const exists = await prisma_1.default.product.findUnique({
             where: { id },
             select: { version: true },
@@ -159,29 +175,31 @@ const updateProduct = async (req, res) => {
             res.status(404).json({ ok: false, error: "Product not found" });
             return;
         }
-        /* 2️⃣ pre-flight version check */
         if (exists.version !== clientVersion) {
             res
                 .status(409)
                 .json({ ok: false, error: "Product changed, reload and try again." });
             return;
         }
-        /* 3️⃣ upsert / connect category */
-        const categorySlug = (0, slugify_1.default)(categoryName, { lower: true });
+        // 2️⃣ upsert category with JSON
+        const categorySlug = (0, slugify_1.default)(categoryNames.en, {
+            lower: true,
+            strict: true,
+        });
         const category = await prisma_1.default.category.upsert({
             where: { slug: categorySlug },
-            create: { name: categoryName, slug: categorySlug },
-            update: {},
-            select: { id: true },
+            create: { slug: categorySlug, names: categoryNames },
+            update: { names: categoryNames },
+            select: { id: true, names: true },
         });
-        /* 4️⃣ gather ids present in payload (for deleteMany filters) */
+        // 3️⃣ prepare deletions
         const imageIdsInPayload = images.filter((i) => i.id).map((i) => i.id);
         const colorIdsInPayload = colors.filter((c) => c.id).map((c) => c.id);
-        /* 5️⃣ single nested update guarded by version and bumping it +1 */
-        const product = await prisma_1.default.product.update({
-            where: { id, version: clientVersion }, // ← guard
+        // 4️⃣ update product
+        const updated = await prisma_1.default.product.update({
+            where: { id, version: clientVersion },
             data: {
-                version: { increment: 1 }, // ← bump
+                version: { increment: 1 },
                 name,
                 slug,
                 price,
@@ -200,7 +218,7 @@ const updateProduct = async (req, res) => {
                 colors: {
                     deleteMany: { id: { notIn: colorIdsInPayload } },
                     upsert: colors.map((col) => {
-                        const colImageIds = col.images?.filter((i) => i.id).map((i) => i.id) ?? [];
+                        const colImageIds = col.images.filter((i) => i.id).map((i) => i.id) || [];
                         return {
                             where: { id: col.id ?? "__new__" },
                             create: {
@@ -232,11 +250,24 @@ const updateProduct = async (req, res) => {
                 category: true,
             },
         });
-        res.json({ ok: true, data: product });
+        /* 🔄  sweep: delete every category that now has zero products */
+        await prisma_1.default.category.deleteMany({
+            where: { products: { none: {} } },
+        });
+        // 5️⃣ flatten category JSON → name
+        const catNames = updated.category.names;
+        const catName = catNames[locale] || updated.category.slug;
+        res.json({
+            ok: true,
+            data: {
+                ...updated,
+                category: { slug: updated.category.slug, name: catName },
+            },
+        });
         return;
     }
     catch (err) {
-        /* 6️⃣ graceful error handling */
+        // handle known Prisma errors
         if (err instanceof library_1.PrismaClientKnownRequestError &&
             err.code === "P2002" &&
             Array.isArray(err.meta?.target) &&
@@ -245,7 +276,6 @@ const updateProduct = async (req, res) => {
             return;
         }
         if (err instanceof library_1.PrismaClientKnownRequestError && err.code === "P2025") {
-            // Version no longer matches (another admin saved between steps 1 & 5)
             res
                 .status(409)
                 .json({ ok: false, error: "Product changed, reload and try again." });
@@ -258,41 +288,59 @@ const updateProduct = async (req, res) => {
 };
 exports.updateProduct = updateProduct;
 /* -------------------------------------------------------------------------- */
-/* ✅ DELETE PRODUCT                                                         */
+/* ✅ DELETE PRODUCT                                                          */
 /* -------------------------------------------------------------------------- */
-const deleteProduct = async (req, res) => {
+const deleteProduct = async (req, res, next) => {
     try {
         await prisma_1.default.product.delete({ where: { id: req.params.id } });
-        res.status(204).send();
+        /* 🔄  sweep categories that are now empty */
+        await prisma_1.default.category.deleteMany({
+            where: { products: { none: {} } },
+        });
+        res.status(204).end();
         return;
     }
     catch (err) {
-        console.error("Delete product failed:", err);
-        res
-            .status(500)
-            .json({ ok: false, error: err.message ?? "Server error" });
-        return;
+        if (err instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+            err.code === "P2003") {
+            res
+                .status(409)
+                .json({ ok: false, error: "Product is referenced elsewhere" });
+            return;
+        }
+        return next(err);
     }
 };
 exports.deleteProduct = deleteProduct;
 /* -------------------------------------------------------------------------- */
-/* ✅ GET SINGLE PRODUCT                                                     */
+/* ✅ GET SINGLE PRODUCT                                                      */
 /* -------------------------------------------------------------------------- */
 const getProductById = async (req, res) => {
     try {
+        const locale = getLocale(req);
         const product = await prisma_1.default.product.findUnique({
             where: { id: req.params.id },
             include: {
                 images: true,
                 colors: { include: { images: true } },
-                category: true,
+                category: { select: { names: true, slug: true } },
             },
         });
         if (!product) {
             res.status(404).json({ ok: false, error: "Product not found" });
             return;
         }
-        res.json({ ok: true, data: product });
+        // flatten category JSON → name
+        const catNames = product.category.names;
+        const catName = catNames[locale] || product.category.slug;
+        res.json({
+            ok: true,
+            data: {
+                ...product,
+                price: Number(product.price),
+                category: { slug: product.category.slug, name: catName },
+            },
+        });
         return;
     }
     catch (err) {
