@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useProductStore, addReviewToProduct } from "../contexts/useStore";
+import { useProductStore } from "../contexts/useStore";
 import { useCartStore } from "../contexts/useCartStore";
 import { useWishlistStore } from "../contexts/useWishlistStore";
 import { useAuthStore } from "../contexts/useAuthStore";
@@ -13,6 +13,7 @@ import {
   Star
 } from "lucide-react";
 import type { Product } from "../types/Product";
+import { addReviewToProduct } from "../services/productService";
 
 const ProductDetails = () => {
   const { t } = useTranslation();

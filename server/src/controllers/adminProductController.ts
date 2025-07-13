@@ -47,7 +47,7 @@ export const createProduct = async (req: Request, res: Response) => {
     price,
     description,
     stock,
-    categoryName,
+    categoryNames,
     sizes,
     images,
     colors,
@@ -64,12 +64,14 @@ export const createProduct = async (req: Request, res: Response) => {
     }
 
     // 2️⃣ upsert category with names JSON
-    const categorySlug = slugify(categoryName, { lower: true });
-    const namesObj = { en: categoryName, ar: "" };
+    const categorySlug = slugify(categoryNames.en, {
+      lower: true,
+      strict: true,
+    });
     const category = await prisma.category.upsert({
       where: { slug: categorySlug },
-      create: { slug: categorySlug, names: namesObj },
-      update: {}, // no changes on update
+      create: { slug: categorySlug, names: categoryNames },
+      update: { names: categoryNames },
     });
 
     // 3️⃣ create product + nested relations
@@ -203,7 +205,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     price,
     description,
     stock,
-    categoryName,
+    categoryNames,
     sizes,
     images = [],
     colors = [],
@@ -227,12 +229,14 @@ export const updateProduct = async (req: Request, res: Response) => {
     }
 
     // 2️⃣ upsert category with JSON
-    const categorySlug = slugify(categoryName, { lower: true });
-    const namesObj = { en: categoryName, ar: "" };
+    const categorySlug = slugify(categoryNames.en, {
+      lower: true,
+      strict: true,
+    });
     const category = await prisma.category.upsert({
       where: { slug: categorySlug },
-      create: { slug: categorySlug, names: namesObj },
-      update: {},
+      create: { slug: categorySlug, names: categoryNames },
+      update: { names: categoryNames },
       select: { id: true, names: true },
     });
 
@@ -299,6 +303,11 @@ export const updateProduct = async (req: Request, res: Response) => {
       },
     });
 
+    /* 🔄  sweep: delete every category that now has zero products */
+    await prisma.category.deleteMany({
+      where: { products: { none: {} } },
+    });
+
     // 5️⃣ flatten category JSON → name
     const catNames = updated.category.names as Record<string, string>;
     const catName = catNames[locale] || updated.category.slug;
@@ -344,6 +353,12 @@ export const deleteProduct = async (
 ) => {
   try {
     await prisma.product.delete({ where: { id: req.params.id } });
+
+    /* 🔄  sweep categories that are now empty */
+    await prisma.category.deleteMany({
+      where: { products: { none: {} } },
+    });
+
     res.status(204).end();
     return;
   } catch (err) {

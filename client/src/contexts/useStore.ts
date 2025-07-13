@@ -1,22 +1,6 @@
 import { create } from "zustand";
-import api from "../api/axios";
-import { Product, ProductReview } from "../types/Product";
+import { Product } from "../types/Product";
 import { fetchAllProducts } from "../services/productService";
-
-/* ─────────────────────────────────────────────── */
-/* Helper API calls                                */
-/* ─────────────────────────────────────────────── */
-
-export const addReviewToProduct = async (
-  productId: string,
-  review: { comment: string; name: string; rating: number }
-): Promise<ProductReview> => {
-  const { data } = await api.post<ProductReview>(
-    `/products/${productId}/reviews`,
-    review
-  );
-  return data;
-};
 
 /* ─────────────────────────────────────────────── */
 /* Zustand store                                   */

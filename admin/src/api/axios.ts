@@ -1,13 +1,15 @@
-/* Shared axios instance + response interceptor
-   -------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/* Shared axios instance + response interceptor                       */
+/* ------------------------------------------------------------------ */
 
-import axios from "axios";
+import axios, { AxiosError, AxiosResponse } from "axios";
+import toast from "react-hot-toast";
 
-/** Server envelopes all JSON in this shape */
-export interface ApiResponse<T> {
+/* ─────── Server envelope shape ─────── */
+export interface ApiResponse<T, M = unknown> {
   ok: boolean;
   data: T;
-  meta?: unknown;
+  meta?: M;          // e.g. { total, page, pageSize }
   error?: string;
 }
 
@@ -16,31 +18,50 @@ const adminApi = axios.create({
   withCredentials: true,
 });
 
-/* ───── unwrap ───── */
+/* ------------------------------------------------------------------ */
+/* Unwrap payloads + global error handler                             */
+/* ------------------------------------------------------------------ */
 adminApi.interceptors.response.use(
-  ({ data }) => {
+  /* ✅ onSuccess ---------------------------------------------------- */
+  ({ data }: AxiosResponse) => {
+    // 1) ­Enveloped responses from our server
     if (data && typeof data === "object" && "ok" in data) {
       const payload = data as ApiResponse<unknown>;
 
-      /* handle server-side error flag */
+      // explicit failure sent by API controller
       if (!payload.ok) {
         return Promise.reject(
-          new Error(payload.error ?? "Unknown API error"),
+          new Error(payload.error ?? "Unknown API error")
         );
       }
 
-      /* keep the envelope when it contains `meta` (lists / pagination) */
-      if ("meta" in payload) {
-        return payload;                    
+      // keep envelope when meta is present (lists / pagination)
+      if ("meta" in payload && payload.meta !== undefined) {
+        return payload;                        // { ok, data, meta }
       }
 
-      /* single-resource endpoints → unwrap */
-      return payload.data;                 // e.g. GET /admin/orders/:id
+      // single-resource endpoint → unwrap down to the plain entity
+      return payload.data;                     // e.g. GET /admin/products/:id
     }
 
-    /* third-party / plain responses */
+    // 2) Plain (third-party) JSON
     return data;
   },
-  (error) => Promise.reject(error),
+
+  /* ❌ onError ------------------------------------------------------ */
+  (err: AxiosError<ApiResponse<never>>) => {
+    // pick the most meaningful message we can find
+    const msg =
+      err.response?.data?.error ??
+      err.message ??
+      "Network error – please try again";
+
+    /* One toast per distinct message */
+    toast.error(msg, { id: msg });
+
+    /* Re-throw so React-Query / callers can still handle it */
+    return Promise.reject(err);
+  }
 );
+
 export default adminApi;

@@ -1,119 +1,82 @@
-import { useEffect, useState, ChangeEvent, FormEvent } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import adminApi from "../api/axios";
+import { useQueryClient } from "@tanstack/react-query";
+import adminApi from "@/api/axios";
 import axios from "axios";
+
+import { ProductDto } from "@/types/product";
+import { CategoryNames } from "@/types/category";
+
+import { useProduct } from "@/hooks/useProduct";
+import { useCategories } from "@/hooks/useCategories";
 import { shapeZodError } from "@/utils/shapeZodError";
 import { isAllowedImageUrl } from "@/utils/isAllowedImage";
 
-/* ------------------------------------------------------------------ */
-/* Types                                                              */
-/* ------------------------------------------------------------------ */
-interface ImageObj {
-  id?: string;
-  url: string;
-}
-interface ColorObj {
-  id?: string;
-  name: string;
-  value: string;
-  images: ImageObj[];
-}
-interface ProductDto {
-  id: string;
-  version: number;
-  name: string;
-  slug: string;
-  description: string;
-  price: number;
-  stock: number;
+/* ───── helpers ───────────────────────────────────────────── */
+const updateList = <T,>(list: T[], i: number, v: Partial<T>) =>
+  list.map((el, idx) => (idx === i ? { ...el, ...v } : el));
+const removeAt = <T,>(list: T[], i: number) =>
+  list.filter((_, idx) => idx !== i);
+const isHex = (h: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(h);
 
-  category?: { name: string; slug: string };
-
-  categoryName: string;
-  sizes: string | string[];
-  images: ImageObj[];
-  colors: ColorObj[];
-}
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
-// immutable update helpers
-const updateList = <T,>(list: T[], idx: number, val: Partial<T>) =>
-  list.map((el, i) => (i === idx ? { ...el, ...val } : el));
-const removeAt = <T,>(list: T[], idx: number) =>
-  list.filter((_, i) => i !== idx);
-
-const isHex = (hex: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
-
-/* ------------------------------------------------------------------ */
-/* Component                                                          */
-/* ------------------------------------------------------------------ */
+/* ───── component ─────────────────────────────────────────── */
 export default function EditProduct() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const EMPTY: ProductDto = {
-    id: "",
-    version: 0,
-    name: "",
-    slug: "",
-    description: "",
-    price: 0,
-    stock: 0,
-    categoryName: "",
-    sizes: "",
-    images: [{ url: "" }],
-    colors: [{ name: "", value: "", images: [{ url: "" }] }],
-  };
 
-  const [loading, setLoading] = useState(true);
+  /* data hooks ---------------------------------------------------- */
+  const { data: prod, isLoading: prodLoading } = useProduct(id);
+  const { data: categories = [], isLoading: catLoading } = useCategories();
+
+  /* local form state (only set once product is fetched) ----------- */
+  const [form, setForm] = useState<ProductDto | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<ProductDto>(EMPTY);
+  const [isNewCat, setIsNewCat] = useState(false);
 
-  /* ----------------------------- Fetch product once ----------------------------- */
+  /* initialise the form once ------------------------------------- */
   useEffect(() => {
-    (async () => {
-      try {
-        /* 🔹 second generic → resolved value IS ProductDto */
-        const p = await adminApi.get<ProductDto, ProductDto>(
-          `/api/admin/products/${id}`
-        );
+    if (!prod) return;
 
-        setForm({
-          ...p,
-          categoryName: p.categoryName ?? p.category?.name ?? "",
-          sizes: Array.isArray(p.sizes) ? p.sizes : p.sizes ?? [],
-        });
-      } catch (err: any) {
-        toast.error(err?.response?.data?.error ?? "Failed to load product");
-        navigate("/products");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id, navigate]);
+    setForm({
+      ...prod,
+      categorySlug: prod.category?.slug ?? "",
+      categoryNames: { en: "", ar: "" },
+      sizes: Array.isArray(prod.sizes) ? prod.sizes : prod.sizes ?? [],
+      images: prod.images?.length ? prod.images : [{ url: "" }],
+      colors: prod.colors?.length
+        ? prod.colors.map((c) => ({
+            ...c,
+            images: c.images?.length ? c.images : [{ url: "" }],
+          }))
+        : [{ name: "", value: "", images: [{ url: "" }] }],
+    });
+  }, [prod]);
 
-  /* ----------------------------- Helpers ----------------------------- */
+  /* guard render while loading ----------------------------------- */
+  if (prodLoading || !form) return <p className="p-6">Loading…</p>;
+
+  /* field helper -------------------------------------------------- */
   const onField =
     <K extends keyof ProductDto>(key: K) =>
     (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((p) => ({ ...p, [key]: e.target.value }));
+      setForm((p) => p && { ...p, [key]: e.target.value });
 
-  /* ----------------------------- Submit ----------------------------- */
+  /* submit -------------------------------------------------------- */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!form) return;
 
-    const price = Number(form.price);
-    const stock = Number(form.stock);
-    const raw = form.sizes;
-    const sizes = Array.isArray(raw)
-      ? raw
-      : raw
+    const price = +form.price;
+    const stock = +form.stock;
+    const sizes = Array.isArray(form.sizes)
+      ? form.sizes
+      : form.sizes
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean);
 
-    /* client-side sanity checks ------------------------------------- */
     if (Number.isNaN(price) || Number.isNaN(stock))
       return toast.error("Price / Stock must be valid numbers");
 
@@ -127,20 +90,44 @@ export default function EditProduct() {
 
     setSaving(true);
     try {
-      await adminApi.put(`/api/admin/products/${form.id}`, {
+      const cleaned = {
         ...form,
-        price,
-        stock,
-        sizes,
-        images: form.images.filter((i) => i.url.trim()),
+        images: form.images
+          .filter((i) => i.url.trim())
+          .map((i) => ({ url: i.url })),
         colors: form.colors
           .filter((c) => c.name.trim() && c.value.trim())
           .map((c) => ({ ...c, images: c.images.filter((i) => i.url.trim()) })),
+      };
+
+      const {
+        categorySlug: _drop,
+        categoryNames: _ignore,
+        ...cleanForSend
+      } = cleaned;
+
+      const selectedNames: CategoryNames = isNewCat
+        ? { en: form.categoryNames.en.trim(), ar: form.categoryNames.ar.trim() }
+        : categories.find((c) => c.slug === form.categorySlug)?.names ?? {
+            en: "",
+            ar: "",
+          };
+
+      await adminApi.put(`/api/admin/products/${form.id}`, {
+        ...cleanForSend,
+        price,
+        stock,
+        sizes,
+        categoryNames: selectedNames,
       });
 
+      /* 🔄 tell React Query that the cached copies are now stale */
+      queryClient.invalidateQueries({ queryKey: ["product", form.id] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+
       toast.success("Product updated");
-      navigate(-1); // optimistic back
-    } catch (err: any) {
+      navigate(-1);
+    } catch (err) {
       const msg =
         axios.isAxiosError(err) && err.response?.data?.error
           ? shapeZodError(err.response.data.error)
@@ -151,64 +138,47 @@ export default function EditProduct() {
     }
   };
 
-  /* ----------------------------- Render ----------------------------- */
-  if (loading) return <p className="p-6">Loading…</p>;
-
+  /* ───── JSX ──────────────────────────────────────────────────── */
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Edit Product</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-xl">
         <fieldset disabled={saving} className="space-y-4">
-          {/* BASIC FIELDS ------------------------------------------------------- */}
-          {[
-            { id: "name", label: "Name", type: "text" },
-            { id: "slug", label: "Slug", type: "text" },
-            { id: "categoryName", label: "Category", type: "text" },
-            {
-              id: "price",
-              label: "Price",
-              type: "number",
-              min: 0,
-              step: "0.01",
-            },
-            { id: "stock", label: "Stock", type: "number", min: 0 },
-          ].map((f) => (
-            <div key={f.id}>
-              <label htmlFor={f.id} className="block text-sm font-medium mb-1">
-                {f.label}
+          {/* BASIC */}
+          {["name", "slug", "price", "stock"].map((f) => (
+            <div key={f}>
+              <label className="block text-sm font-medium mb-1">
+                {f[0].toUpperCase() + f.slice(1)}
               </label>
               <input
-                {...f}
-                id={f.id}
-                value={(form as any)[f.id]}
-                onChange={onField(f.id as any)}
+                id={f}
+                type={f === "price" || f === "stock" ? "number" : "text"}
+                value={(form as any)[f]}
+                onChange={onField(f as any)}
                 className="w-full border p-2 rounded"
               />
             </div>
           ))}
 
+          {/* DESCRIPTION */}
           <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium mb-1"
-            >
+            <label className="block text-sm font-medium mb-1">
               Description
             </label>
             <textarea
-              id="description"
               value={form.description}
               onChange={onField("description")}
               className="w-full border p-2 rounded"
             />
           </div>
 
+          {/* SIZES */}
           <div>
-            <label htmlFor="sizes" className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-1">
               Sizes (comma-separated)
             </label>
             <input
-              id="sizes"
               value={
                 Array.isArray(form.sizes) ? form.sizes.join(", ") : form.sizes
               }
@@ -217,27 +187,105 @@ export default function EditProduct() {
             />
           </div>
 
-          {/* IMAGES ------------------------------------------------------------- */}
+          {/* CATEGORY */}
+          <div className="space-y-2">
+            <label className="font-semibold">Category</label>
+            {catLoading ? (
+              <p className="text-sm text-gray-500">Loading categories…</p>
+            ) : (
+              <>
+                <select
+                  value={isNewCat ? "__new" : form.categorySlug}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "__new") {
+                      setIsNewCat(true);
+                      setForm({
+                        ...form,
+                        categorySlug: "",
+                        categoryNames: { en: "", ar: "" },
+                      });
+                    } else {
+                      const cat = categories.find((c) => c.slug === v)!;
+                      setIsNewCat(false);
+                      setForm({
+                        ...form,
+                        categorySlug: v,
+                        categoryNames: cat.names,
+                      });
+                    }
+                  }}
+                  className="w-full border p-2 rounded"
+                >
+                  <option value="" disabled>
+                    -- Select Category --
+                  </option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.slug}>
+                      {c.names.en} / {c.names.ar}
+                    </option>
+                  ))}
+                  <option value="__new">+ New Category…</option>
+                </select>
+
+                {isNewCat && (
+                  <div className="grid md:grid-cols-2 gap-3 mt-2">
+                    <input
+                      value={form.categoryNames.en}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          categoryNames: {
+                            ...form.categoryNames,
+                            en: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="Category (English)"
+                      className="border p-2 rounded"
+                    />
+                    <input
+                      dir="rtl"
+                      value={form.categoryNames.ar}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          categoryNames: {
+                            ...form.categoryNames,
+                            ar: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="الفئة (Arabic)"
+                      className="border p-2 rounded"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* IMAGES */}
           <div className="space-y-2">
             <span className="font-semibold">Images</span>
             {form.images.map((img, i) => (
               <div key={i} className="flex gap-2 items-center">
                 <input
-                  aria-label={`Image ${i + 1}`}
                   value={img.url}
                   onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      images: updateList(p.images, i, { url: e.target.value }),
-                    }))
+                    setForm({
+                      ...form,
+                      images: updateList(form.images, i, {
+                        url: e.target.value,
+                      }),
+                    })
                   }
                   className="flex-1 border p-2 rounded"
                 />
                 <button
                   type="button"
-                  aria-label="Remove image"
                   onClick={() =>
-                    setForm((p) => ({ ...p, images: removeAt(p.images, i) }))
+                    setForm({ ...form, images: removeAt(form.images, i) })
                   }
                   className="text-red-500"
                 >
@@ -247,132 +295,114 @@ export default function EditProduct() {
             ))}
             <button
               type="button"
-              onClick={() =>
-                setForm((p) => ({ ...p, images: [...p.images, { url: "" }] }))
-              }
               className="text-sm text-blue-600"
+              onClick={() =>
+                setForm({ ...form, images: [...form.images, { url: "" }] })
+              }
             >
               + Add image
             </button>
           </div>
 
-          {/* COLORS ------------------------------------------------------------- */}
+          {/* COLORS */}
           <div className="space-y-4">
             <span className="font-semibold">Colors</span>
-
             {form.colors.map((c, i) => (
               <div key={i} className="border p-4 rounded space-y-2 bg-gray-50">
                 <input
-                  aria-label="Color name"
                   value={c.name}
                   onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      colors: updateList(p.colors, i, { name: e.target.value }),
-                    }))
+                    setForm({
+                      ...form,
+                      colors: updateList(form.colors, i, {
+                        name: e.target.value,
+                      }),
+                    })
                   }
                   placeholder="Color name"
                   className="w-full border p-2 rounded"
                 />
                 <input
-                  aria-label="Color hex"
                   value={c.value}
                   onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      colors: updateList(p.colors, i, {
+                    setForm({
+                      ...form,
+                      colors: updateList(form.colors, i, {
                         value: e.target.value,
                       }),
-                    }))
+                    })
                   }
                   placeholder="#hex"
                   className="w-full border p-2 rounded"
                 />
-
-                {/* Color images */}
                 {c.images.map((img, j) => (
                   <div key={j} className="flex gap-2 items-center">
                     <input
-                      aria-label={`Color image ${j + 1}`}
                       value={img.url}
-                      onChange={(e) =>
-                        setForm((p) => {
-                          const newColors = [...p.colors];
-                          newColors[i].images = updateList(
-                            newColors[i].images,
-                            j,
-                            {
-                              url: e.target.value,
-                            }
-                          );
-                          return { ...p, colors: newColors };
-                        })
-                      }
+                      onChange={(e) => {
+                        const newColors = [...form.colors];
+                        newColors[i].images = updateList(
+                          newColors[i].images,
+                          j,
+                          { url: e.target.value }
+                        );
+                        setForm({ ...form, colors: newColors });
+                      }}
                       className="flex-1 border p-2 rounded"
                     />
                     <button
                       type="button"
-                      aria-label="Remove color image"
-                      onClick={() =>
-                        setForm((p) => {
-                          const newColors = [...p.colors];
-                          newColors[i].images = removeAt(
-                            newColors[i].images,
-                            j
-                          );
-                          return { ...p, colors: newColors };
-                        })
-                      }
+                      onClick={() => {
+                        const newColors = [...form.colors];
+                        newColors[i].images = removeAt(newColors[i].images, j);
+                        setForm({ ...form, colors: newColors });
+                      }}
                       className="text-red-500"
                     >
                       ✕
                     </button>
                   </div>
                 ))}
-
                 <button
                   type="button"
                   className="text-sm text-blue-600 pr-3"
-                  onClick={() =>
-                    setForm((p) => {
-                      const newColors = [...p.colors];
-                      newColors[i].images.push({ url: "" });
-                      return { ...p, colors: newColors };
-                    })
-                  }
+                  onClick={() => {
+                    const newColors = [...form.colors];
+                    newColors[i].images.push({ url: "" });
+                    setForm({ ...form, colors: newColors });
+                  }}
                 >
                   + Add color image
                 </button>
-
                 <button
                   type="button"
                   className="text-sm text-red-600"
                   onClick={() =>
-                    setForm((p) => ({ ...p, colors: removeAt(p.colors, i) }))
+                    setForm({ ...form, colors: removeAt(form.colors, i) })
                   }
                 >
                   Remove color
                 </button>
               </div>
             ))}
-
             <button
               type="button"
               className="text-sm text-blue-600"
               onClick={() =>
-                setForm((p) => ({
-                  ...p,
+                setForm({
+                  ...form,
                   colors: [
-                    ...p.colors,
+                    ...form.colors,
                     { name: "", value: "", images: [{ url: "" }] },
                   ],
-                }))
+                })
               }
             >
               + Add color
             </button>
           </div>
 
+          {/* ACTION */}
           <button
             type="submit"
             disabled={saving}

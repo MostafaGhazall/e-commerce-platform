@@ -4,7 +4,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { shapeZodError } from "@/utils/shapeZodError";
 import { isAllowedImageUrl } from "@/utils/isAllowedImage";
-import { useTranslation } from "react-i18next";
+import { CategoryNames } from "@/types/category";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                              */
@@ -27,15 +27,15 @@ interface ProductForm {
   description: string;
   price: string;
   stock: string;
-  categoryName: string;
-  newNameEn: string;
-  newNameAr: string;
+  categorySlug: string; // selected existing category OR ""
+  categoryNames: CategoryNames; // holds English + Arabic for “new”
   sizes: string;
   images: string[];
   colors: ColorForm[];
 }
 
-const emptyColor: ColorForm = { name: "", value: "", images: [""] };
+const emptyNames = { en: "", ar: "" };
+const newColor = (): ColorForm => ({ name: "", value: "", images: [""] });
 
 /* ------------------------------------------------------------------ */
 /* Regex helpers                                                      */
@@ -46,8 +46,6 @@ const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 /* Component                                                          */
 /* ------------------------------------------------------------------ */
 export default function AddProduct() {
-  const { i18n } = useTranslation();
-  const lang = i18n.language; // "en" or "ar"
   const navigate = useNavigate();
 
   /* category list --------------------------------------------------- */
@@ -63,18 +61,17 @@ export default function AddProduct() {
     description: "",
     price: "",
     stock: "",
-    categoryName: "",
-    newNameEn: "",
-    newNameAr: "",
+    categorySlug: "",
+    categoryNames: { ...emptyNames },
     sizes: "",
     images: [""], // start with one empty slot
-    colors: [{ ...emptyColor }],
+    colors: [newColor()],
   });
   /* fetch categories once ------------------------------------------ */
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await axios.get<Category[]>(`/api/categories?lang=${lang}`);
+        const { data } = await axios.get<Category[]>("/api/categories");
         setCategories(data);
       } catch (err) {
         console.error("Failed to load categories", err);
@@ -82,7 +79,7 @@ export default function AddProduct() {
         setCatLoading(false);
       }
     })();
-  }, [lang]);
+  }, []);
 
   /* generic onChange handler --------------------------------------- */
   const handleInputChange = (
@@ -96,16 +93,19 @@ export default function AddProduct() {
 
   /* client-side guard ---------------------------------------------- */
   const validateForm = () => {
-    const required = [
-      "name",
-      "slug",
-      "price",
-      "stock",
-      "categoryName",
-    ] as const;
+    const required = ["name", "slug", "price", "stock"] as const;
+
+    if (!form.categorySlug && !isNewCat)
+      return toast.error("Please select a category or create a new one");
+
+    if (
+      isNewCat &&
+      (!form.categoryNames.en.trim() || !form.categoryNames.ar.trim())
+    )
+      return toast.error("Both English and Arabic names are required");
 
     if (required.some((key) => !form[key])) {
-      toast.error("Name, slug, price, stock and category are required");
+      toast.error("Name, slug, price, stock are required");
       return false;
     }
 
@@ -174,16 +174,32 @@ export default function AddProduct() {
 
     setLoading(true);
     try {
+      const {
+        categorySlug: _drop,
+        categoryNames: _ignore,
+        ...cleanedForSend
+      } = cleaned;
+      const selectedNames = isNewCat
+        ? {
+            en: form.categoryNames.en.trim(),
+            ar: form.categoryNames.ar.trim(),
+          }
+        : categories.find((c) => c.slug === form.categorySlug)?.names ?? {
+            en: "",
+            ar: "",
+          };
+
       await axios.post(
         "/api/admin/products",
         {
-          ...cleaned,
+          ...cleanedForSend,
           price: parseFloat(form.price),
           stock: parseInt(form.stock, 10),
           sizes: form.sizes
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean),
+          categoryNames: selectedNames,
         },
         { withCredentials: true }
       );
@@ -255,24 +271,33 @@ export default function AddProduct() {
           />
         </div>
 
-        {/* CATEGORY SELECT -------------------------------------------- */}
+        {/* CATEGORY SELECT ------------------------------------------------- */}
         <div className="space-y-2">
           <label className="font-semibold">Category</label>
+
           {catLoading ? (
             <p className="text-sm text-gray-500">Loading categories…</p>
           ) : (
             <>
               <select
-                name="categoryName"
-                value={isNewCat ? "__new" : form.categoryName}
+                value={isNewCat ? "__new" : form.categorySlug}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "__new") {
+                  const v = e.target.value;
+                  if (v === "__new") {
                     setIsNewCat(true);
-                    setForm((f) => ({ ...f, categoryName: "" }));
+                    setForm((p) => ({
+                      ...p,
+                      categorySlug: "",
+                      categoryNames: { ...emptyNames },
+                    }));
                   } else {
+                    const cat = categories.find((c) => c.slug === v)!;
                     setIsNewCat(false);
-                    setForm((f) => ({ ...f, categoryName: val }));
+                    setForm((p) => ({
+                      ...p,
+                      categorySlug: v,
+                      categoryNames: cat.names, // keep Arabic too
+                    }));
                   }
                 }}
                 className="w-full border border-gray-300 p-3 rounded-lg"
@@ -280,31 +305,48 @@ export default function AddProduct() {
                 <option value="" disabled>
                   -- Select Category --
                 </option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>
-                    {cat.names.en} / {cat.names.ar}
+
+                {categories.map((c) => (
+                  <option key={c.id} value={c.slug}>
+                    {c.names.en} / {c.names.ar}
                   </option>
                 ))}
+
                 <option value="__new">+ New Category…</option>
               </select>
 
               {isNewCat && (
-                <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                   <input
-                    name="newNameEn"
-                    value={form.newNameEn}
-                    onChange={handleInputChange}
-                    placeholder="English name"
-                    className="w-full border border-gray-300 p-3 rounded-lg mt-2"
+                    value={form.categoryNames.en}
+                    onChange={(e) =>
+                      setForm((p) => ({
+                        ...p,
+                        categoryNames: {
+                          ...p.categoryNames,
+                          en: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Category (English)"
+                    className="border border-gray-300 p-3 rounded-lg"
                   />
                   <input
-                    name="newNameAr"
-                    value={form.newNameAr}
-                    onChange={handleInputChange}
-                    placeholder="Arabic name"
-                    className="w-full border border-gray-300 p-3 rounded-lg mt-2"
+                    dir="rtl"
+                    value={form.categoryNames.ar}
+                    onChange={(e) =>
+                      setForm((p) => ({
+                        ...p,
+                        categoryNames: {
+                          ...p.categoryNames,
+                          ar: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="الفئة (Arabic)"
+                    className="border border-gray-300 p-3 rounded-lg"
                   />
-                </>
+                </div>
               )}
             </>
           )}
@@ -450,7 +492,7 @@ export default function AddProduct() {
             onClick={() =>
               setForm((p) => ({
                 ...p,
-                colors: [...p.colors, { ...emptyColor }],
+                colors: [...p.colors, newColor()],
               }))
             }
             className="text-sm text-[var(--primary-orange)]"

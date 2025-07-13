@@ -123,6 +123,12 @@ export const colorSchema = z.object({
   images: z.array(imageSchema),
 });
 
+export const categoryNamesSchema = z.object({
+  en: z.string().trim().min(1, "English name is required"),
+  ar: z.string().trim().min(1, "Arabic name is required"),
+});
+export type CategoryNames = z.infer<typeof categoryNamesSchema>;
+
 /* -------------------------------------------------------------------------- */
 /* ⚙️  Product – create / update                                              */
 /* -------------------------------------------------------------------------- */
@@ -136,7 +142,7 @@ export const baseProductSchema = z.object({
   price: z.union([z.string(), z.number()]).transform(Number),
   description: z.string().trim(),
   stock: z.number().int().nonnegative(),
-  categoryName: z.string().trim().min(1),
+  categoryNames: categoryNamesSchema,
   sizes: z.array(z.string().trim()).nonempty(),
   images: z.array(imageSchema).min(1, "At least one image"),
   colors: z.array(colorSchema),
@@ -150,8 +156,3 @@ export const updateProductSchema = baseProductSchema.extend({
 });
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 
-export const createCategorySchema = z.object({
-  nameEn: z.string().min(1),
-  nameAr: z.string().min(1),
-  slug:   z.string().min(1),
-});

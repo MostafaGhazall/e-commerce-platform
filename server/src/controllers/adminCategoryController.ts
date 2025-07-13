@@ -1,26 +1,49 @@
 import { Request, Response } from "express";
 import prisma from "../prisma";
 
-type Locale = "en" | "ar";
-type NamesMap = Record<Locale, string>;
-
+/* GET /api/categories?withCounts=1&nonEmpty=1 */
 export const listCategories = async (req: Request, res: Response) => {
-  // pick locale from `?lang=ar` or default to English
-  const locale: Locale = req.query.lang === "ar" ? "ar" : "en";
+  const wantCounts = req.query.withCounts === "1";
+  const onlyNonEmpty = req.query.nonEmpty === "1";
 
+  /* ------------ DB query ---------------- */
   const cats = await prisma.category.findMany({
-    select: { slug: true, names: true },
     orderBy: { slug: "asc" },
+
+    /* ① if counts requested, include the relation count */
+    ...(wantCounts && {
+      include: { _count: { select: { products: true } } },
+    }),
+
+    /* ② if empty cats should be filtered out */
+    ...(onlyNonEmpty && {
+      where: { products: { some: {} } }, // “some” = at least one product
+    }),
+
+    /* ③ always select the common fields */
+    select: {
+      id: true,
+      slug: true,
+      names: true,
+      ...(wantCounts && { _count: true }),
+    },
   });
 
-  const payload = cats.map((c) => {
-    // assert that `names` is our `{ en: string; ar: string }` map
-    const names = c.names as NamesMap;
-    return {
-      slug: c.slug,
-      name: names[locale] ?? c.slug,  // fallback to slug
-    };
-  });
+  /* ------------ shape response ---------------- */
+  const shaped = cats.map((c) =>
+    wantCounts
+      ? {
+          id: c.id,
+          slug: c.slug,
+          names: c.names,
+          count: (c as any)._count.products, // safe thanks to wantCounts
+        }
+      : {
+          id: c.id,
+          slug: c.slug,
+          names: c.names,
+        }
+  );
 
-  res.json(payload);
+  res.json(shaped);
 };
