@@ -9,7 +9,7 @@ const library_1 = require("@prisma/client/runtime/library");
 const client_1 = require("@prisma/client");
 const parseIntSafe_1 = require("../utils/parseIntSafe");
 const clamp_1 = require("../utils/clamp");
-const userValidators_1 = require("../../../shared/userValidators");
+const userValidators_1 = require("../../shared/userValidators");
 const slugify_1 = __importDefault(require("slugify"));
 /** Extract locale from ?lang=ar or default to "en" */
 function getLocale(req) {
@@ -60,7 +60,9 @@ const createProduct = async (req, res) => {
                     create: colors.map((c) => ({
                         name: c.name,
                         value: c.value,
-                        images: { create: c.images.map((img) => ({ url: img.url })) },
+                        images: {
+                            create: c.images.map((i) => ({ url: i.url })),
+                        },
                     })),
                 },
             },
@@ -218,14 +220,17 @@ const updateProduct = async (req, res) => {
                 colors: {
                     deleteMany: { id: { notIn: colorIdsInPayload } },
                     upsert: colors.map((col) => {
-                        const colImageIds = col.images.filter((i) => i.id).map((i) => i.id) || [];
+                        const colImageIds = col.images.filter((i) => i.id).map((i) => i.id) ||
+                            [];
                         return {
                             where: { id: col.id ?? "__new__" },
                             create: {
                                 name: col.name,
                                 value: col.value,
                                 images: {
-                                    createMany: { data: col.images.map((i) => ({ url: i.url })) },
+                                    createMany: {
+                                        data: col.images.map((i) => ({ url: i.url })),
+                                    },
                                 },
                             },
                             update: {

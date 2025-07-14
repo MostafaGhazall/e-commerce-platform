@@ -9,7 +9,7 @@ import {
   updateProductSchema,
   CreateProductInput,
   UpdateProductInput,
-} from "../../../shared/userValidators";
+} from "../../shared/userValidators";
 import slugify from "slugify";
 
 /* -------------------------------------------------------------------------- */
@@ -84,12 +84,14 @@ export const createProduct = async (req: Request, res: Response) => {
         stock,
         sizes,
         categoryId: category.id,
-        images: { create: images.map((img) => ({ url: img.url })) },
+        images: { create: images.map((img: ImageInput) => ({ url: img.url })) },
         colors: {
-          create: colors.map((c) => ({
+          create: colors.map((c: ColorInput) => ({
             name: c.name,
             value: c.value,
-            images: { create: c.images.map((img) => ({ url: img.url })) },
+            images: {
+              create: c.images.map((i: ImageInput) => ({ url: i.url })),
+            },
           })),
         },
       },
@@ -268,16 +270,19 @@ export const updateProduct = async (req: Request, res: Response) => {
 
         colors: {
           deleteMany: { id: { notIn: colorIdsInPayload } },
-          upsert: colors.map((col) => {
+          upsert: colors.map((col: ColorInput) => {
             const colImageIds =
-              col.images.filter((i) => i.id).map((i) => i.id!) || [];
+              col.images.filter((i: ImageInput) => i.id).map((i) => i.id!) ||
+              [];
             return {
               where: { id: col.id ?? "__new__" },
               create: {
                 name: col.name,
                 value: col.value,
                 images: {
-                  createMany: { data: col.images.map((i) => ({ url: i.url })) },
+                  createMany: {
+                    data: col.images.map((i: ImageInput) => ({ url: i.url })),
+                  },
                 },
               },
               update: {
@@ -285,7 +290,7 @@ export const updateProduct = async (req: Request, res: Response) => {
                 value: col.value,
                 images: {
                   deleteMany: { id: { notIn: colImageIds } },
-                  upsert: col.images.map((img) => ({
+                  upsert: col.images.map((img: ImageInput) => ({
                     where: { id: img.id ?? "__new__" },
                     create: { url: img.url },
                     update: { url: img.url },

@@ -7,7 +7,7 @@ exports.me = exports.logout = exports.login = exports.register = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../prisma"));
-const userValidators_1 = require("../../../shared/userValidators");
+const userValidators_1 = require("../../shared/userValidators");
 const JWT_SECRET = process.env.JWT_SECRET;
 // helper to create & send cookie + safe user object
 function issueCookie(res, user) {

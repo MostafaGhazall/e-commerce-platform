@@ -1,7 +1,7 @@
 import { Router } from "express";
 import prisma from "../prisma";
 import { authenticate, AuthRequest } from "../middleware/auth";
-import { updateProfileSchema } from "../../../shared/userValidators";
+import { updateProfileSchema } from "../../shared/userValidators";
 
 const router = Router();
 

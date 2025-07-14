@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma";
 import { AuthRequest } from "../middleware/auth";
-import { registerSchema, loginSchema } from "../../../shared/userValidators";
+import { registerSchema, loginSchema } from "../../shared/userValidators";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
