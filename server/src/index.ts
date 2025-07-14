@@ -22,11 +22,10 @@ import adminCategoryRoutes from "./routes/adminCategoryRoutes";
 /* -------------------------------------------------------------------------- */
 /* Config                                                                     */
 /* -------------------------------------------------------------------------- */
-const PORT = process.env.PORT ? Number(process.env.PORT) : (() => { throw new Error("PORT is required") })();
+const PORT = process.env.PORT || 5000;
 const ORIGINS = [
-  "http://localhost:5173",
-  "https://e-commerce-platform-ri8x.vercel.app", // admin
-  "https://e-commerce-platform-5qfo.vercel.app", // client
+  process.env.CLIENT_URL || "http://localhost:5173",
+  process.env.ADMIN_URL  || "http://localhost:5174", // local fallback if needed
 ];
 
 
@@ -43,13 +42,7 @@ app.disable("etag");                // we’ll handle caching manually for JSON
 /* -------------------------------------------------------------------------- */
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || ORIGINS.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: ORIGINS,
     credentials: true,
   })
 );
