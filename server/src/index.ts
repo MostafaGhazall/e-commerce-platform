@@ -43,7 +43,13 @@ app.disable("etag");                // we’ll handle caching manually for JSON
 /* -------------------------------------------------------------------------- */
 app.use(
   cors({
-    origin: ORIGINS,
+    origin: function (origin, callback) {
+      if (!origin || ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
