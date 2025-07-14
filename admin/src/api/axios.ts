@@ -14,7 +14,7 @@ export interface ApiResponse<T, M = unknown> {
 }
 
 const adminApi = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,
 });
 

@@ -5,7 +5,7 @@ import type { AdminOrder } from "@/types/adminOrder";
 /* Axios instance                                            */
 /* ────────────────────────────────────────────────────────── */
 const adminApi = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,
 });
 
