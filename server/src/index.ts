@@ -24,8 +24,9 @@ import adminCategoryRoutes from "./routes/adminCategoryRoutes";
 /* -------------------------------------------------------------------------- */
 const PORT   = process.env.PORT        || 5000;
 const ORIGINS = [
-  process.env.CLIENT_URL || "http://localhost:5173",
-  process.env.ADMIN_URL  || "http://localhost:5174", // local fallback if needed
+  "http://localhost:5173",
+  "https://e-commerce-platform-ri8x.vercel.app", // admin
+  "https://e-commerce-platform-5qfo.vercel.app", // client
 ];
 
 
