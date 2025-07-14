@@ -22,7 +22,7 @@ import adminCategoryRoutes from "./routes/adminCategoryRoutes";
 /* -------------------------------------------------------------------------- */
 /* Config                                                                     */
 /* -------------------------------------------------------------------------- */
-const PORT   = process.env.PORT        || 5000;
+const PORT = process.env.PORT || 5000;
 const ORIGINS = [
   "http://localhost:5173",
   "https://e-commerce-platform-ri8x.vercel.app", // admin
