@@ -115,5 +115,5 @@ app.use(
 /* -------------------------------------------------------------------------- */
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
-  console.log(`✅  Server running on http://localhost:${PORT}`);
+  console.log(`✅  Server v1 running on http://localhost:${PORT}`);
 });
