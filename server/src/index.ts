@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-import helmet from "helmet";
+// import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
@@ -47,10 +47,10 @@ app.use(
   })
 );
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
-}));
+// app.use(helmet({
+//   crossOriginResourcePolicy: { policy: "cross-origin" },
+//   hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
+// }));
 
 app.use(compression());              // gzip/deflate
 app.use(express.json({ limit: "1mb" }));
