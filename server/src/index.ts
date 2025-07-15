@@ -7,15 +7,15 @@ import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import pino from "pino-http";
 
-import authRoutes from "./routes/auth";
-import productRoutes from "./routes/products";
-import cartRoutes from "./routes/cart";
-import wishlistRoutes from "./routes/wishlist";
-import orderRoutes from "./routes/orders";
-import userRoutes from "./routes/user";
-import adminAuthRoutes from "./routes/adminAuthRoutes";
-import adminProductRoutes from "./routes/adminProductRoutes";
-import adminOrderRoutes from "./routes/adminOrderRoutes";
+import authRoutes           from "./routes/auth";
+import productRoutes        from "./routes/products";
+import cartRoutes           from "./routes/cart";
+import wishlistRoutes       from "./routes/wishlist";
+import orderRoutes          from "./routes/orders";
+import userRoutes           from "./routes/user";
+import adminAuthRoutes      from "./routes/adminAuthRoutes";
+import adminProductRoutes   from "./routes/adminProductRoutes";
+import adminOrderRoutes     from "./routes/adminOrderRoutes";
 import adminDashboardRoutes from "./routes/adminDashboardRoutes";
 import adminCategoryRoutes from "./routes/adminCategoryRoutes";
 
@@ -23,56 +23,47 @@ import adminCategoryRoutes from "./routes/adminCategoryRoutes";
 /* Config                                                                     */
 /* -------------------------------------------------------------------------- */
 const PORT = process.env.PORT || 5000;
-const ORIGINS = process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) ?? [];
+const ORIGINS = [
+  process.env.CLIENT_URL || "http://localhost:5173",
+  process.env.ADMIN_URL  || "http://localhost:5174", // local fallback if needed
+];
+
 
 /* -------------------------------------------------------------------------- */
 /* App init                                                                   */
 /* -------------------------------------------------------------------------- */
 const app = express();
-app.set("trust proxy", 1); // correct client IPs behind nginx/ELB
+app.set("trust proxy", 1);          // correct client IPs behind nginx/ELB
 app.disable("x-powered-by");
-app.disable("etag"); // we’ll handle caching manually for JSON
+app.disable("etag");                // we’ll handle caching manually for JSON
 
 /* -------------------------------------------------------------------------- */
 /* Global middleware                                                          */
 /* -------------------------------------------------------------------------- */
 app.use(
   cors({
+    origin: "*",
     credentials: true,
-    origin: (origin, cb) => {
-      // server-to-server or curl: no Origin header
-      if (!origin) return cb(null, true);
-
-      // allow all *.vercel.app previews
-      if (origin.endsWith(".vercel.app")) return cb(null, true);
-
-      // exact allow-list
-      return ORIGINS.includes(origin)
-        ? cb(null, true)
-        : cb(new Error("Not allowed by CORS"));
-    },
   })
 );
 
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-    hsts: { maxAge: 60 * 24 * 60 * 60 }, // 60 days
-  })
-);
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
+}));
 
-app.use(compression()); // gzip/deflate
+app.use(compression());              // gzip/deflate
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
-app.use(pino()); // structured request logs
+app.use(pino());                     // structured request logs
 
 // Tiny rate-limit: 100 req / 15 min per IP for auth & search
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
 });
-app.use("/api/auth", authLimiter);
+app.use("/api/auth",    authLimiter);
 app.use("/api/admin/auth", authLimiter);
 
 /* Prevent browsers caching any JSON */
@@ -95,26 +86,28 @@ app.get("/", (_req, res): void => {
   res.send("API is running…");
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/user", userRoutes);
+app.use("/api/auth",          authRoutes);
+app.use("/api/products",      productRoutes);
+app.use("/api/cart",          cartRoutes);
+app.use("/api/wishlist",      wishlistRoutes);
+app.use("/api/orders",        orderRoutes);
+app.use("/api/user",          userRoutes);
 
-app.use("/api/categories", adminCategoryRoutes);
-app.use("/api/admin/auth", adminAuthRoutes);
+app.use("/api/categories",     adminCategoryRoutes);
+app.use("/api/admin/auth",     adminAuthRoutes);
 app.use("/api/admin/products", adminProductRoutes);
-app.use("/api/admin/orders", adminOrderRoutes);
-app.use("/api/admin", adminDashboardRoutes);
+app.use("/api/admin/orders",   adminOrderRoutes);
+app.use("/api/admin",          adminDashboardRoutes);
 
 /* -------------------------------------------------------------------------- */
 /* Unified async error handler                                                */
 /* -------------------------------------------------------------------------- */
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  _req.log.error({ err }, "Unhandled error");
-  res.status(500).json({ ok: false, error: "Internal Server Error" });
-});
+app.use(
+  (err: any, _req: Request, res: Response, _next: NextFunction) => {
+    _req.log.error({ err }, "Unhandled error");
+    res.status(500).json({ ok: false, error: "Internal Server Error" });
+  }
+);
 
 /* -------------------------------------------------------------------------- */
 /* Start                                                                      */
