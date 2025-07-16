@@ -37,29 +37,26 @@ app.set("trust proxy", 1);          // correct client IPs behind nginx/ELB
 app.disable("x-powered-by");
 app.disable("etag");                // we’ll handle caching manually for JSON
 
+app.use(pino());                     // structured request logs
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
+/* -------------------------------------------------------------------------- */
+/* Global middleware                                                          */
+/* -------------------------------------------------------------------------- */
+app.use(cors({
+  origin: function (origin, callback) {
+      callback(null, true);
+  },
+  credentials: true,
 }));
 
 app.use(compression());              // gzip/deflate
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
-app.use(pino());                     // structured request logs
-
-/* -------------------------------------------------------------------------- */
-/* Global middleware                                                          */
-/* -------------------------------------------------------------------------- */
-app.use(
-  cors({
-    origin: "*",
-    credentials: true,
-  })
-);
-
-app.options("*", cors());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
+}));
 
 // Tiny rate-limit: 100 req / 15 min per IP for auth & search
 const authLimiter = rateLimit({
