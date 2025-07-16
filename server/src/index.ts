@@ -55,7 +55,7 @@ app.use(pino());                     // structured request logs
 app.use(
   cors({
     origin: "*",
-    credentials: true,
+    credentials: false,
   })
 );
 
