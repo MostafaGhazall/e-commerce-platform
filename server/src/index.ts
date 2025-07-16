@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-// import helmet from "helmet";
+import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
@@ -38,10 +38,10 @@ app.disable("x-powered-by");
 app.disable("etag");                // we’ll handle caching manually for JSON
 
 
-// app.use(helmet({
-//   crossOriginResourcePolicy: { policy: "cross-origin" },
-//   hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
-// }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: { maxAge: 60 * 24 * 60 * 60 },      // 60 days
+}));
 
 app.use(compression());              // gzip/deflate
 app.use(express.json({ limit: "1mb" }));
@@ -55,7 +55,7 @@ app.use(pino());                     // structured request logs
 app.use(
   cors({
     origin: "*",
-    credentials: false,
+    credentials: true,
   })
 );
 
@@ -115,5 +115,5 @@ app.use(
 /* -------------------------------------------------------------------------- */
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
-  console.log(`✅  Server v1 running on http://localhost:${PORT}`);
+  console.log(`✅  Server running on http://localhost:${PORT}`);
 });
