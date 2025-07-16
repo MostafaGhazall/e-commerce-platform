@@ -53,7 +53,7 @@ app.use(pino());                     // structured request logs
 /* Global middleware                                                          */
 /* -------------------------------------------------------------------------- */
 app.use(
-  cors()
+  cors({origin: true,})
   //   origin: "*",
   //   credentials: false,
   // })
