@@ -53,11 +53,13 @@ app.use(pino());                     // structured request logs
 /* Global middleware                                                          */
 /* -------------------------------------------------------------------------- */
 app.use(
-  cors({origin: true,})
-  //   origin: "*",
-  //   credentials: false,
-  // })
+  cors({
+    origin: "*",
+    credentials: true,
+  })
 );
+
+app.options("*", cors());
 
 // Tiny rate-limit: 100 req / 15 min per IP for auth & search
 const authLimiter = rateLimit({
@@ -94,9 +96,9 @@ app.use("/api/wishlist",      wishlistRoutes);
 app.use("/api/orders",        orderRoutes);
 app.use("/api/user",          userRoutes);
 
+app.use("/api/categories",     adminCategoryRoutes);
 app.use("/api/admin/auth",     adminAuthRoutes);
 app.use("/api/admin/products", adminProductRoutes);
-app.use("/api/categories",     adminCategoryRoutes);
 app.use("/api/admin/orders",   adminOrderRoutes);
 app.use("/api/admin",          adminDashboardRoutes);
 
