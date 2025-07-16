@@ -43,15 +43,13 @@ app.use(pino());                     // structured request logs
 /* Global middleware                                                          */
 /* -------------------------------------------------------------------------- */
 app.use(cors({
-  origin: function (origin, callback) {
-      callback(null, true);
-  },
-  credentials: true,
+  origin: "*",
+  // credentials: true,
 }));
 
 app.use(compression());              // gzip/deflate
 app.use(express.json({ limit: "1mb" }));
-app.use(cookieParser());
+// app.use(cookieParser());
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
